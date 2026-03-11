@@ -312,6 +312,45 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
 .msg-event-type { font-weight:700;color:var(--navy); }
 .msg-event-date { color:var(--text2);font-size:11px;margin-top:1px; }
 
+
+/* ── Outreach quick-action enhancements ── */
+.ot-tab-count {
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 5px;margin-left:5px;
+  background:rgba(0,0,0,.08);border-radius:10px;
+  font-size:10px;font-weight:800;line-height:1;
+}
+.outreach-tab.active .ot-tab-count { background:rgba(200,167,93,.25);color:#92700a; }
+.qa-wrap { position:relative;display:inline-block; }
+.qa-btn {
+  padding:3px 7px;border:1px solid var(--border);border-radius:6px;
+  background:#fff;color:var(--navy);font-size:11px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:background .1s;
+}
+.qa-btn:hover { background:var(--bg); }
+.qa-menu {
+  display:none;position:fixed;z-index:1000;
+  background:#fff;border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,.12);padding:4px;min-width:150px;
+}
+.qa-menu.open { display:block; }
+.qa-item {
+  display:block;width:100%;text-align:left;padding:6px 10px;
+  border:none;background:transparent;font-size:12px;font-weight:600;
+  cursor:pointer;border-radius:5px;transition:background .1s;
+}
+.qa-item:hover { background:var(--bg); }
+.ot-row-actions { display:flex;gap:4px;align-items:center;justify-content:flex-end; }
+.tick-y { color:#16a34a;font-weight:800;font-size:14px;line-height:1; }
+.tick-n { color:#cbd5e1;font-size:13px;line-height:1; }
+.stat-card-row { display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px 0; }
+.stat-chip {
+  display:flex;flex-direction:column;align-items:center;padding:8px 14px;
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;min-width:72px;
+}
+.stat-chip-num { font-size:20px;font-weight:800;color:var(--navy);line-height:1; }
+.stat-chip-label { font-size:10px;font-weight:700;color:var(--text2);margin-top:3px;text-align:center; }
+
 </style>
 </head>
 <body>
@@ -354,6 +393,7 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
       <div class="topbar-title" id="topbar-title">Dashboard</div>
     </div>
     <div class="topbar-actions" id="topbar-actions">
+      <button id="va-exit-btn" onclick="exitVAMode()" style="display:none;align-items:center;gap:6px;padding:6px 13px;background:#fff8e1;border:1.5px solid #f59e0b;border-radius:7px;font-size:12px;font-weight:700;color:#92400e;cursor:pointer;white-space:nowrap">⚠ VA Mode — Exit to Full Access</button>
       <button class="btn btn-ghost btn-sm" onclick="openImport()">↑ Import CSV</button>
       <button class="btn btn-primary" onclick="openAddLead()">＋ Add Lead</button>
     </div>
@@ -848,10 +888,14 @@ create policy "allow all" on tle_dial_lists    for all using (true) with check (
         <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Message History</div>
         <div id="dp-msg-events-list" class="msg-event-list"></div>
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('intro-sent')">📨 Intro Sent</button>
-          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('gif-sent')">🎬 GIF Sent</button>
-          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('followup-1')">🔁 Follow-up</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('intro-sent')">📨 Intro</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('gif-sent')">🎬 GIF</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('followup-1')">🔁 Follow-up 1</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('followup-2')">🔁 Follow-up 2</button>
           <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('replied')">💬 Replied</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('call-booked')">📅 Mark Booked</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('nurture')">♻ Nurture</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickLogEvent('dead')" style="color:#dc2626">💀 Dead</button>
         </div>
       </div>
     </div>
@@ -1064,7 +1108,7 @@ const pageTitles = {
 };
 function showPage(name){
   const s = DB.settings;
-  if(s.role==='va' && ['reports','settings'].includes(name)) return;
+  if(s.role==='va' && name==='reports') return;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const page = document.getElementById('page-'+name);
@@ -1684,6 +1728,17 @@ function updateUserProfile(){
   document.getElementById('user-display-name').textContent=s.name||'Calum';
   document.getElementById('user-display-role').textContent=s.role==='va'?'VA Access':'Full Access';
   document.getElementById('user-avatar').textContent=(s.name||'C')[0].toUpperCase();
+  const exitBtn=document.getElementById('va-exit-btn');
+  if(exitBtn) exitBtn.style.display=s.role==='va'?'inline-flex':'none';
+}
+function exitVAMode(){
+  const s=DB.settings;
+  s.role='owner';
+  DB.settings=s;
+  const sel=document.getElementById('settings-role');
+  if(sel) sel.value='owner';
+  updateUserProfile();
+  toast('✅ Full access restored');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2147,6 +2202,101 @@ function getOD(lead) {
 }
 
 // Also patch the v4 migration to match by name fallback
+
+// ── Outreach quick-action helpers ──────────────────────────
+let _qaOpen = null;  // currently open dropdown leadId+stage
+
+function openQAMenu(btn, leadId) {
+  // Close any open menu
+  document.querySelectorAll('.qa-menu.open').forEach(m => m.classList.remove('open'));
+  const menu = document.getElementById('qa-menu-' + leadId);
+  if (!menu) return;
+  _qaOpen = leadId;
+  // Position fixed near the button
+  const r = btn.getBoundingClientRect();
+  menu.style.top  = (r.bottom + 4) + 'px';
+  menu.style.left = Math.max(8, r.right - menu.offsetWidth || r.left) + 'px';
+  menu.classList.add('open');
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function _close(e) {
+      if (!menu.contains(e.target)) {
+        menu.classList.remove('open');
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 0);
+}
+
+function qaSetStage(leadId, stage) {
+  document.querySelectorAll('.qa-menu.open').forEach(m => m.classList.remove('open'));
+  // Update lead in localStorage
+  const leads = getLeads();
+  const lead  = leads.find(l => l.id === leadId);
+  if (lead) {
+    lead.msgStage        = stage;
+    lead.msgStageUpdated = new Date().toISOString().split('T')[0];
+    // Also stamp the relevant raw field
+    const fieldMap = {
+      'intro-sent':  'firstSent',
+      'gif-sent':    'gifSent',
+      'followup-1':  'followUpSent',
+      'followup-2':  'followUpSent',
+      'replied':     'firstReplied',
+      'call-booked': 'firstBooked',
+    };
+    if (fieldMap[stage]) lead[fieldMap[stage]] = true;
+    DB.leads = leads;
+    // Refresh _OD maps so getOD() reflects the update
+    _OD_BY_ID[leadId]  = Object.assign(_OD_BY_ID[leadId]  || {}, {msgStage: stage, msgStageUpdated: lead.msgStageUpdated});
+    const nk = (lead.name||'').toLowerCase().trim();
+    if (_OD_BY_NAME[nk]) Object.assign(_OD_BY_NAME[nk], {msgStage: stage});
+    logMsgEvent(leadId, stage, '');
+  }
+  toast('Stage → ' + (MSG_STAGES[stage]||{label:stage}).label);
+  updateBadges();
+  // Re-render current outreach tab
+  renderOutreachTab(_outreachCurrentTab);
+  if (currentLeadId === leadId) renderDetailOutreachTab(leadId);
+}
+
+// Next logical stage for a given current stage
+function nextStage(stage) {
+  const map = {
+    'not-connected': 'new-connection',
+    'new-connection':'intro-sent',
+    'intro-sent':    'gif-sent',
+    'gif-sent':      'followup-1',
+    'followup-1':    'followup-2',
+    'followup-2':    'replied',
+    'replied':       'call-booked',
+    'call-booked':   'call-booked',
+  };
+  return map[stage] || null;
+}
+
+// Build a quick-action menu HTML for a lead row
+function qaMenuHtml(lead) {
+  const cur = getLeadMsgStage(lead);
+  const stages = [
+    ['not-connected', '🔗 Not Connected'],
+    ['new-connection','🤝 New Connection'],
+    ['intro-sent',    '📨 Intro Sent'],
+    ['gif-sent',      '🎬 GIF Sent'],
+    ['followup-1',    '🔁 Follow-up 1'],
+    ['followup-2',    '🔁 Follow-up 2'],
+    ['replied',       '💬 Replied'],
+    ['call-booked',   '📅 Call Booked'],
+    ['nurture',       '♻️ Nurture'],
+    ['dead',          '💀 Dead Lead'],
+  ];
+  const items = stages.map(([s, label]) =>
+    `<button class="qa-item${s===cur?' style="font-weight:800;color:var(--gold)"':''}"
+      onclick="event.stopPropagation();qaSetStage(${lead.id},'${s}')">${label}</button>`
+  ).join('');
+  return `<div class="qa-menu" id="qa-menu-${lead.id}">${items}</div>`;
+}
+
 const MSG_STAGES = {
   'not-connected': { label:'Not Connected',   color:'#94a3b8', bg:'#f8fafc' },
   'new-connection':{ label:'New Connection',  color:'#64748b', bg:'#f1f5f9' },
@@ -2276,17 +2426,64 @@ function switchOutreachTab(tabId){
 }
 
 function renderOutreach(){
-  const role = DB.settings.role;
-  // Hide analytics for VA
-  document.querySelectorAll('.ot-owner-only').forEach(el=>{
-    el.style.display = role==='va' ? 'none' : '';
-  });
-  renderOutreachTab(_outreachCurrentTab);
-  // Status bar
+  const role  = DB.settings.role;
   const leads = getLeads();
-  const withStage = leads.filter(l=>l.msgStage).length;
-  const bar = document.getElementById('outreach-status-bar');
-  if(bar) bar.textContent = `${withStage} leads tracked · ${leads.length} total`;
+  document.querySelectorAll('.ot-owner-only').forEach(el=>{
+    el.style.display = role==='va'?'none':'';
+  });
+  // Quick stat chips row (injected above tab bar)
+  (function renderStatChips(){
+    let chipsEl = document.getElementById('ot-stat-chips');
+    if(!chipsEl){
+      chipsEl = document.createElement('div');
+      chipsEl.id = 'ot-stat-chips';
+      chipsEl.className = 'stat-card-row';
+      const tabsEl = document.getElementById('outreach-subtabs');
+      if(tabsEl) tabsEl.parentNode.insertBefore(chipsEl, tabsEl);
+    }
+    const OL = typeof IMPORTED_LEADS!=='undefined' ? IMPORTED_LEADS : getLeads();
+    const cn = k => OL.filter(l=>l[k]===true).length;
+    const chips = [
+      {n:OL.length,               l:'Total'},
+      {n:cn('connected'),         l:'Connected'},
+      {n:cn('firstSent'),         l:'Sent'},
+      {n:cn('firstReplied'),      l:'Replied'},
+      {n:cn('gifSent'),           l:'GIF Sent'},
+      {n:cn('gifReplied'),        l:'GIF Replied'},
+      {n:cn('followUpSent'),      l:'FU'},
+      {n:cn('firstBooked'),       l:'Booked'},
+      {n:cn('firstTaken'),        l:'Taken'},
+    ];
+    chipsEl.innerHTML = chips.map(c=>
+      `<div class="stat-chip"><div class="stat-chip-num">${c.n}</div><div class="stat-chip-label">${c.l}</div></div>`
+    ).join('');
+  })();
+  // Compute counts per tab
+  const counts = {
+    'ot-queue':    leads.filter(l=>outreachNeedsAction(l)).length,
+    'ot-followup': leads.filter(l=>['followup-1','followup-2'].includes(getLeadMsgStage(l))).length,
+    'ot-active':   leads.filter(l=>getLeadMsgStage(l)==='replied').length,
+    'ot-stale':    leads.filter(l=>['intro-sent','gif-sent','no-reply'].includes(getLeadMsgStage(l))).length,
+    'ot-dial':     leads.filter(l=>l.phone&&['new-connection','replied','followup-1','followup-2'].includes(getLeadMsgStage(l))).length,
+    'ot-booked':   leads.filter(l=>getLeadMsgStage(l)==='call-booked').length,
+    'ot-nurture':  leads.filter(l=>getLeadMsgStage(l)==='nurture').length,
+  };
+  // Update tab labels with counts
+  const tabOrder=['ot-queue','ot-followup','ot-active','ot-stale','ot-dial','ot-booked','ot-nurture','ot-analytics'];
+  const tabLabels=['Queue','Follow-ups','Active','Stale','Dial','Booked','Nurture','Analytics'];
+  document.querySelectorAll('.outreach-tab').forEach((btn,i)=>{
+    const id=tabOrder[i];
+    const n=counts[id];
+    const badge=n?`<span class="ot-tab-count">${n}</span>`:'';
+    btn.innerHTML=tabLabels[i]+badge;
+  });
+  // Status bar
+  const bar=document.getElementById('outreach-status-bar');
+  if(bar){
+    const withStage=leads.filter(l=>getLeadMsgStage(l)!=='not-connected').length;
+    bar.textContent=`${withStage} leads tracked · ${leads.length} total`;
+  }
+  renderOutreachTab(_outreachCurrentTab);
 }
 
 function renderOutreachTab(tabId){
@@ -2305,38 +2502,56 @@ function renderOutreachTab(tabId){
 
 function outreachTableHtml(rows, emptyMsg){
   if(!rows.length) return `<div class="outreach-empty">${emptyMsg||'Nothing here yet.'}</div>`;
-  return `<table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr style="border-bottom:1px solid var(--border)">
-      <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Name</th>
-      <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Stage</th>
-      <th style="text-align:center;padding:8px 5px;font-size:10px;font-weight:700;color:var(--text2)" title="1st Sent">Sent</th>
-      <th style="text-align:center;padding:8px 5px;font-size:10px;font-weight:700;color:var(--text2)" title="1st Replied">Rpl</th>
-      <th style="text-align:center;padding:8px 5px;font-size:10px;font-weight:700;color:var(--text2)" title="GIF Sent">GIF</th>
-      <th style="text-align:center;padding:8px 5px;font-size:10px;font-weight:700;color:var(--text2)" title="GIF Replied">G✉</th>
-      <th style="text-align:center;padding:8px 5px;font-size:10px;font-weight:700;color:var(--text2)" title="Follow-up">FU</th>
-      <th style="text-align:center;padding:8px 5px;font-size:10px;font-weight:700;color:var(--text2)" title="Booked">Bk</th>
-      <th style="text-align:left;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)">Seq</th>
-      <th></th>
+  const T = v => v===true
+    ? '<span class="tick-y">✓</span>'
+    : '<span class="tick-n">–</span>';
+  return `<div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">
+    <thead><tr style="border-bottom:2px solid var(--border)">
+      <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;white-space:nowrap">Name</th>
+      <th style="text-align:left;padding:8px 8px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Stage</th>
+      <th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)" title="First message sent">Msg Sent</th>
+      <th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)" title="Lead replied to first message">Replied</th>
+      <th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)" title="GIF message sent">GIF Sent</th>
+      <th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)" title="Lead replied to GIF message">GIF Replied</th>
+      <th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)" title="Follow-up message sent">Follow-up</th>
+      <th style="text-align:center;padding:8px 6px;font-size:10px;font-weight:700;color:var(--text2)" title="Call booked">Booked</th>
+      <th style="text-align:left;padding:8px 8px;font-size:10px;font-weight:700;color:var(--text2)" title="Message sequence / type">Msg Type</th>
+      <th style="padding:8px 8px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;text-align:right">Action</th>
     </tr></thead>
-    <tbody>${rows.map(lead=>{
+    <tbody>
+    ${rows.map(lead=>{
       const od=getOD(lead);
-      const stage=od.msgStage||getLeadMsgStage(lead);
+      const stage=getLeadMsgStage(lead);
       const st=MSG_STAGES[stage]||MSG_STAGES['not-connected'];
-      const t=v=>v===true?'<span style="color:#16a34a;font-weight:700;font-size:13px">✓</span>':'<span style="color:#e2e8f0">·</span>';
+      const ns=nextStage(stage);
+      const nsLabel={'intro-sent':'📨 Send Intro','gif-sent':'🎬 Mark GIF Sent','followup-1':'🔁 Send Follow-up',
+        'followup-2':'🔁 Follow-up 2','replied':'💬 Mark Replied','call-booked':'📅 Mark Booked'}[ns]||'';
       return `<tr class="outreach-lead-row" onclick="openDetail(${lead.id})" style="border-bottom:1px solid var(--border2,#f1f5f9)">
-        <td style="padding:7px 10px;font-weight:600">${lead.name||'—'}</td>
-        <td style="padding:7px 10px"><span class="msg-stage-pill" style="color:${st.color};background:${st.bg}">${st.label}</span></td>
-        <td style="padding:7px 5px;text-align:center">${t(od.firstSent)}</td>
-        <td style="padding:7px 5px;text-align:center">${t(od.firstReplied)}</td>
-        <td style="padding:7px 5px;text-align:center">${t(od.gifSent)}</td>
-        <td style="padding:7px 5px;text-align:center">${t(od.gifReplied)}</td>
-        <td style="padding:7px 5px;text-align:center">${t(od.followUpSent)}</td>
-        <td style="padding:7px 5px;text-align:center">${t(od.firstBooked)}</td>
-        <td style="padding:7px 6px"><span class="seq-badge">${od.sequenceId||'—'}</span></td>
-        <td style="padding:7px 6px"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openDetail(${lead.id})" style="font-size:11px">→</button></td>
+        <td style="padding:7px 10px;font-weight:600;white-space:nowrap">${lead.name||'—'}</td>
+        <td style="padding:7px 8px;white-space:nowrap">
+          <span class="msg-stage-pill" style="color:${st.color};background:${st.bg}">${st.label}</span>
+        </td>
+        <td style="padding:7px 4px;text-align:center">${T(od.firstSent)}</td>
+        <td style="padding:7px 4px;text-align:center">${T(od.firstReplied)}</td>
+        <td style="padding:7px 4px;text-align:center">${T(od.gifSent)}</td>
+        <td style="padding:7px 4px;text-align:center">${T(od.gifReplied)}</td>
+        <td style="padding:7px 4px;text-align:center">${T(od.followUpSent)}</td>
+        <td style="padding:7px 4px;text-align:center">${T(od.firstBooked)}</td>
+        <td style="padding:7px 6px;white-space:nowrap"><span class="seq-badge">${od.sequenceId||'—'}</span></td>
+        <td style="padding:7px 8px" onclick="event.stopPropagation()">
+          <div class="ot-row-actions">
+            ${ns&&nsLabel?`<button class="qa-btn" onclick="qaSetStage(${lead.id},'${ns}')" title="Move to next stage">${nsLabel}</button>`:''}
+            <div class="qa-wrap">
+              <button class="qa-btn" onclick="openQAMenu(this,${lead.id})" title="Change stage">▾</button>
+              ${qaMenuHtml(lead)}
+            </div>
+          </div>
+        </td>
       </tr>`;
     }).join('')}
-    </tbody></table>`;
+    </tbody>
+  </table></div>`;
 }
 
 function renderOTQueue(leads){
