@@ -279,6 +279,8 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
   text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:16px;
 }
 .outreach-import-zone:hover { border-color:var(--gold); }
+@keyframes syncpulse{0%,100%{opacity:1}50%{opacity:.35}}
+.sync-pulsing{animation:syncpulse 1.2s ease-in-out infinite}
 .analytics-grid {
   display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;
   margin-bottom:20px;
@@ -395,6 +397,10 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
     </div>
     <div class="topbar-actions" id="topbar-actions">
       <button id="va-exit-btn" onclick="exitVAMode()" style="display:none;align-items:center;gap:6px;padding:6px 13px;background:#fff8e1;border:1.5px solid #f59e0b;border-radius:7px;font-size:12px;font-weight:700;color:#92400e;cursor:pointer;white-space:nowrap">⚠ VA Mode — Exit to Full Access</button>
+      <div id="sync-status-wrap" style="display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:20px;background:var(--bg);border:1px solid var(--border);font-size:12px;color:var(--text2);cursor:default" title="Supabase sync status">
+        <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex-shrink:0;transition:background .3s"></div>
+        <span id="sync-label">Offline</span>
+      </div>
       <button class="btn btn-ghost btn-sm" onclick="openImport()">↑ Import CSV</button>
       <button class="btn btn-primary" onclick="openAddLead()">＋ Add Lead</button>
     </div>
@@ -580,7 +586,11 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
           <div class="form-section" style="margin-top:0">Data Management</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ Export All Leads CSV</button>
-            <button class="btn btn-ghost btn-sm" onclick="openImport()">↑ Import CSV</button>
+            <div id="sync-status-wrap" style="display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:20px;background:var(--bg);border:1px solid var(--border);font-size:12px;color:var(--text2);cursor:default" title="Supabase sync status">
+        <div id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex-shrink:0;transition:background .3s"></div>
+        <span id="sync-label">Offline</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openImport()">↑ Import CSV</button>
             <button class="btn btn-danger btn-sm" onclick="confirmClear()">⚠ Clear All Data</button>
           </div>
         </div>
@@ -1358,16 +1368,45 @@ async function sbFetch(table, options = {}) {
   if (select) params.push(`select=${select}`);
   filters.forEach(f => params.push(f));
   if (params.length) url += '?' + params.join('&');
+  const prefer = upsert ? 'return=representation,resolution=merge-duplicates'
+                        : (method === 'POST' ? 'return=representation' : '');
   const headers = {
     'apikey': SUPABASE_KEY,
     'Authorization': 'Bearer ' + SUPABASE_KEY,
     'Content-Type': 'application/json',
-    'Prefer': upsert ? 'resolution=merge-duplicates' : (method === 'POST' ? 'return=representation' : ''),
+    'Prefer': prefer,
   };
   const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  if (!res.ok) { const err = await res.text(); console.error('Supabase error:', err); return null; }
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`[Supabase] ${method} ${table} failed:`, err);
+    throw new Error(`${table}: ${res.status} ${err.slice(0,120)}`);
+  }
   if (method === 'DELETE' || res.status === 204) return true;
   return res.json();
+}
+
+// ── Sync status indicator ──
+function setSyncStatus(state, msg) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  if (!dot || !lbl) return;
+  dot.classList.remove('sync-pulsing');
+  if (state === 'syncing') {
+    dot.style.background = '#f59e0b';
+    dot.classList.add('sync-pulsing');
+    lbl.textContent = msg || 'Syncing…';
+  } else if (state === 'ok') {
+    dot.style.background = '#22c55e';
+    const now = new Date();
+    lbl.textContent = msg || `Synced ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  } else if (state === 'error') {
+    dot.style.background = '#ef4444';
+    lbl.textContent = msg || 'Sync error';
+  } else {
+    dot.style.background = '#cbd5e1';
+    lbl.textContent = msg || 'Offline';
+  }
 }
 
 // ── DB layer: localStorage (offline) or Supabase (live) ──
@@ -1398,33 +1437,40 @@ const SB = {
   // Pull all data from Supabase and write to localStorage (on app load)
   async pull() {
     if (!USE_SUPABASE) return;
+    setSyncStatus('syncing');
     try {
       const [leads, tasks, calls, notes, settings] = await Promise.all([
-        sbFetch('tle_leads', { select: '*' }),
-        sbFetch('tle_tasks', { select: '*' }),
-        sbFetch('tle_calls', { select: '*' }),
-        sbFetch('tle_notes', { select: '*' }),
+        sbFetch('tle_leads',    { select: '*' }),
+        sbFetch('tle_tasks',    { select: '*' }),
+        sbFetch('tle_calls',    { select: '*' }),
+        sbFetch('tle_notes',    { select: '*' }),
         sbFetch('tle_settings', { select: '*' }),
       ]);
-      if (leads   && leads.length)    { const d = leads.map(r=>r.data); localStorage.setItem('tle_leads',   JSON.stringify(d)); }
-      if (tasks   && tasks.length)    { const d = tasks.map(r=>r.data); localStorage.setItem('tle_tasks',   JSON.stringify(d)); }
-      if (calls   && calls.length)    { const d = calls.map(r=>r.data); localStorage.setItem('tle_calls',   JSON.stringify(d)); }
-      if (notes   && notes.length)    { const d = notes.map(r=>r.data); localStorage.setItem('tle_notes',   JSON.stringify(d)); }
-      if (settings && settings.length){ localStorage.setItem('tle_settings', JSON.stringify(settings[0].data)); }
-      toast('✅ Synced from Supabase');
-    } catch(e) { console.error('SB.pull failed:', e); }
+      // Only overwrite localStorage if Supabase actually returned data
+      if (leads    && leads.length)    { localStorage.setItem('tle_leads',    JSON.stringify(leads.map(r=>r.data))); }
+      if (tasks    && tasks.length)    { localStorage.setItem('tle_tasks',    JSON.stringify(tasks.map(r=>r.data))); }
+      if (calls    && calls.length)    { localStorage.setItem('tle_calls',    JSON.stringify(calls.map(r=>r.data))); }
+      if (notes    && notes.length)    { localStorage.setItem('tle_notes',    JSON.stringify(notes.map(r=>r.data))); }
+      if (settings && settings.length) { localStorage.setItem('tle_settings', JSON.stringify(settings[0].data)); }
+      setSyncStatus('ok');
+    } catch(e) {
+      console.error('SB.pull failed:', e);
+      setSyncStatus('error', 'Pull failed');
+      toast('❌ Failed to pull from Supabase — ' + e.message);
+    }
   },
 
   // Push all localStorage data up to Supabase (full replace per table)
   async push() {
     if (!USE_SUPABASE) return;
+    setSyncStatus('syncing', 'Pushing…');
     try {
       const leads    = DB.leads    || [];
       const tasks    = DB.tasks    || [];
       const calls    = DB.calls    || [];
       const notes    = DB.notes    || [];
       const settings = DB.settings || {};
-      // Delete existing rows then re-insert (simplest upsert approach)
+      // Full replace: delete all then reinsert (safe manual push)
       await Promise.all([
         sbFetch('tle_leads',    { method: 'DELETE', filters: ['id=neq.0'] }),
         sbFetch('tle_tasks',    { method: 'DELETE', filters: ['id=neq.0'] }),
@@ -1433,22 +1479,27 @@ const SB = {
         sbFetch('tle_settings', { method: 'DELETE', filters: ['id=neq.0'] }),
       ]);
       await Promise.all([
-        leads.length    ? sbFetch('tle_leads',    { method: 'POST', body: leads.map(d=>({id: d.id, data: d})) }) : null,
-        tasks.length    ? sbFetch('tle_tasks',    { method: 'POST', body: tasks.map(d=>({id: d.id, data: d})) }) : null,
-        calls.length    ? sbFetch('tle_calls',    { method: 'POST', body: calls.map(d=>({id: d.id, data: d})) }) : null,
-        notes.length    ? sbFetch('tle_notes',    { method: 'POST', body: notes.map(d=>({id: d.id, data: d})) }) : null,
-        sbFetch('tle_settings', { method: 'POST', body: [{id: 1, data: settings}] }),
+        leads.length ? sbFetch('tle_leads',    { method:'POST', body:leads.map(d=>({id:d.id,data:d})) }) : null,
+        tasks.length ? sbFetch('tle_tasks',    { method:'POST', body:tasks.map(d=>({id:d.id,data:d})) }) : null,
+        calls.length ? sbFetch('tle_calls',    { method:'POST', body:calls.map(d=>({id:d.id,data:d})) }) : null,
+        notes.length ? sbFetch('tle_notes',    { method:'POST', body:notes.map(d=>({id:d.id,data:d})) }) : null,
+        sbFetch('tle_settings', { method:'POST', body:[{id:1,data:settings}] }),
       ]);
-      toast('✅ Pushed to Supabase');
-    } catch(e) { console.error('SB.push failed:', e); toast('❌ Supabase sync failed'); }
+      setSyncStatus('ok');
+      toast('✅ Pushed to Supabase — all data synced');
+    } catch(e) {
+      console.error('SB.push failed:', e);
+      setSyncStatus('error');
+      toast('❌ Push failed: ' + e.message);
+    }
   },
 
   // Incremental saves (called automatically by DB setters)
-  async saveLeads(v)    { if(!USE_SUPABASE)return; await sbFetch('tle_leads',    {method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_leads',{method:'POST',body:v.map(d=>({id:d.id,data:d}))}); },
-  async saveTasks(v)    { if(!USE_SUPABASE)return; await sbFetch('tle_tasks',    {method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_tasks',{method:'POST',body:v.map(d=>({id:d.id,data:d}))}); },
-  async saveCalls(v)    { if(!USE_SUPABASE)return; await sbFetch('tle_calls',    {method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_calls',{method:'POST',body:v.map(d=>({id:d.id,data:d}))}); },
-  async saveNotes(v)    { if(!USE_SUPABASE)return; await sbFetch('tle_notes',    {method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_notes',{method:'POST',body:v.map(d=>({id:d.id,data:d}))}); },
-  async saveSettings(v) { if(!USE_SUPABASE)return; await sbFetch('tle_settings', {method:'DELETE',filters:['id=neq.0']}); await sbFetch('tle_settings',{method:'POST',body:[{id:1,data:v}]}); },
+  async saveLeads(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_leads',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Lead save failed — check Supabase connection'); console.error(e); } },
+  async saveTasks(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_tasks',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Task save failed'); console.error(e); } },
+  async saveCalls(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_calls',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Call save failed'); console.error(e); } },
+  async saveNotes(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_notes',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Note save failed'); console.error(e); } },
+  async saveSettings(v) { if(!USE_SUPABASE)return; try{ await sbFetch('tle_settings',{method:'POST',body:[{id:1,data:v}],upsert:true}); }catch(e){ toast('❌ Settings save failed'); console.error(e); } },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1470,9 +1521,9 @@ Object.defineProperties(DB, {
 });
 
 // SB outreach sync extensions
-SB.saveMsgEvents    = async function(v){ if(!USE_SUPABASE)return; await sbFetch('tle_msg_events',   {method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_msg_events',   {method:'POST',body:v.map(d=>({id:d.id,data:d}))}); };
-SB.saveMsgTemplates = async function(v){ if(!USE_SUPABASE)return; await sbFetch('tle_msg_templates',{method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_msg_templates',{method:'POST',body:v.map(d=>({id:d.id,data:d}))}); };
-SB.saveDialLists    = async function(v){ if(!USE_SUPABASE)return; await sbFetch('tle_dial_lists',   {method:'DELETE',filters:['id=neq.0']}); if(v.length) await sbFetch('tle_dial_lists',   {method:'POST',body:v.map(d=>({id:d.id,data:d}))}); };
+SB.saveMsgEvents    = async function(v){ if(!USE_SUPABASE)return; try{ if(v.length) await sbFetch('tle_msg_events',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); }catch(e){console.error('saveMsgEvents failed:',e);} };
+SB.saveMsgTemplates = async function(v){ if(!USE_SUPABASE)return; try{ if(v.length) await sbFetch('tle_msg_templates',{method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); }catch(e){console.error('saveMsgTemplates failed:',e);} };
+SB.saveDialLists    = async function(v){ if(!USE_SUPABASE)return; try{ if(v.length) await sbFetch('tle_dial_lists',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); }catch(e){console.error('saveDialLists failed:',e);} };
 
 // Extend SB.pull to include outreach tables
 const _origPull = SB.pull.bind(SB);
@@ -2238,7 +2289,8 @@ function saveLead(){
 function deleteLead(id){
   if(!confirm('Delete this lead?'))return;
   DB.leads=getLeads().filter(l=>l.id!==id);
-  toast('Deleted');renderLeadsTable();updateBadges();
+  if(USE_SUPABASE) sbFetch('tle_leads',{method:'DELETE',filters:['id=eq.'+id]}).catch(e=>console.error('Delete from Supabase failed:',e));
+  toast('Lead deleted');renderLeadsTable();updateBadges();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2523,6 +2575,28 @@ function currentActivePage(){
 }
 
 // ═══════════════════════════════════════════════════════════
+// AUTO-SYNC — polls Supabase every 30s, refreshes current view
+// ═══════════════════════════════════════════════════════════
+let _autoSyncTimer = null;
+function startAutoSync(){
+  if(!USE_SUPABASE) return;
+  setSyncStatus('syncing');
+  // Immediate pull on first call
+  SB.pull().then(()=>{
+    initFilters();
+    renderPage(currentActivePage());
+    updateBadges();
+  });
+  // Poll every 30 seconds
+  _autoSyncTimer = setInterval(async ()=>{
+    await SB.pull();
+    initFilters();
+    renderPage(currentActivePage());
+    updateBadges();
+  }, 30000);
+}
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',async ()=>{
@@ -2573,12 +2647,11 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   document.querySelectorAll('.modal-overlay').forEach(o=>{
     o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
   });
-  // If Supabase is configured, pull latest data on every load
+  // If Supabase is configured: pull immediately, then start 30s polling
   if(USE_SUPABASE){
-    await SB.pull();
-    initFilters();
-    renderDashboard();
-    updateBadges();
+    startAutoSync();
+  } else {
+    setSyncStatus('offline', 'Local only');
   }
 });
 
