@@ -1367,8 +1367,9 @@ async function sbFetch(table, options = {}) {
   const params = [];
   if (select) params.push(`select=${select}`);
   filters.forEach(f => params.push(f));
+  if (upsert) params.push('on_conflict=id');   // required by Supabase for upsert
   if (params.length) url += '?' + params.join('&');
-  const prefer = upsert ? 'return=representation,resolution=merge-duplicates'
+  const prefer = upsert ? 'resolution=merge-duplicates'
                         : (method === 'POST' ? 'return=representation' : '');
   const headers = {
     'apikey': SUPABASE_KEY,
@@ -1383,7 +1384,9 @@ async function sbFetch(table, options = {}) {
     throw new Error(`${table}: ${res.status} ${err.slice(0,120)}`);
   }
   if (method === 'DELETE' || res.status === 204) return true;
-  return res.json();
+  if (res.status === 204 || res.headers.get('content-length') === '0') return true;
+  const text = await res.text();
+  return text ? JSON.parse(text) : true;
 }
 
 // ── Sync status indicator ──
@@ -1415,7 +1418,7 @@ function setSyncStatus(state, msg) {
 const DB = {
   // ── Leads ──
   get leads(){ try{return JSON.parse(localStorage.getItem('tle_leads')||'null')||null}catch(e){return null} },
-  set leads(v){ localStorage.setItem('tle_leads',JSON.stringify(v)); if(USE_SUPABASE) SB.saveLeads(v); },
+  set leads(v){ localStorage.setItem('tle_leads',JSON.stringify(v)); _lastLocalSave=Date.now(); if(USE_SUPABASE) SB.saveLeads(v); },
   // ── Tasks ──
   get tasks(){ try{return JSON.parse(localStorage.getItem('tle_tasks')||'[]')}catch(e){return[]} },
   set tasks(v){ localStorage.setItem('tle_tasks',JSON.stringify(v)); if(USE_SUPABASE) SB.saveTasks(v); },
@@ -1440,14 +1443,15 @@ const SB = {
     setSyncStatus('syncing');
     try {
       const [leads, tasks, calls, notes, settings] = await Promise.all([
-        sbFetch('tle_leads',    { select: '*' }),
-        sbFetch('tle_tasks',    { select: '*' }),
-        sbFetch('tle_calls',    { select: '*' }),
-        sbFetch('tle_notes',    { select: '*' }),
-        sbFetch('tle_settings', { select: '*' }),
+        sbFetch('tle_leads',    { select: '*', filters: ['limit=10000'] }),
+        sbFetch('tle_tasks',    { select: '*', filters: ['limit=10000'] }),
+        sbFetch('tle_calls',    { select: '*', filters: ['limit=10000'] }),
+        sbFetch('tle_notes',    { select: '*', filters: ['limit=10000'] }),
+        sbFetch('tle_settings', { select: '*', filters: ['limit=100'] }),
       ]);
       // Only overwrite localStorage if Supabase actually returned data
-      if (leads    && leads.length)    { localStorage.setItem('tle_leads',    JSON.stringify(leads.map(r=>r.data))); }
+      // Only overwrite local leads if we haven't written locally in last 15s (prevents poll undoing a fresh save)
+      if (leads && leads.length && (Date.now() - _lastLocalSave > 15000)) { localStorage.setItem('tle_leads', JSON.stringify(leads.map(r=>r.data))); }
       if (tasks    && tasks.length)    { localStorage.setItem('tle_tasks',    JSON.stringify(tasks.map(r=>r.data))); }
       if (calls    && calls.length)    { localStorage.setItem('tle_calls',    JSON.stringify(calls.map(r=>r.data))); }
       if (notes    && notes.length)    { localStorage.setItem('tle_notes',    JSON.stringify(notes.map(r=>r.data))); }
@@ -1532,7 +1536,7 @@ SB.pull = async function(){
   if(!USE_SUPABASE) return;
   try{
     const [me, mt, dl] = await Promise.all([
-      sbFetch('tle_msg_events',    {select:'*'}),
+      sbFetch('tle_msg_events',    {select:'*', filters:['limit=10000']}),
       sbFetch('tle_msg_templates', {select:'*'}),
       sbFetch('tle_dial_lists',    {select:'*'}),
     ]);
@@ -2578,6 +2582,7 @@ function currentActivePage(){
 // AUTO-SYNC — polls Supabase every 30s, refreshes current view
 // ═══════════════════════════════════════════════════════════
 let _autoSyncTimer = null;
+let _lastLocalSave = 0; // timestamp of last local write — poll skips leads overwrite within 15s
 function startAutoSync(){
   if(!USE_SUPABASE) return;
   setSyncStatus('syncing');
