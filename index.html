@@ -1418,7 +1418,8 @@ function setSyncStatus(state, msg) {
 const DB = {
   // ── Leads ──
   get leads(){ try{return JSON.parse(localStorage.getItem('tle_leads')||'null')||null}catch(e){return null} },
-  set leads(v){ localStorage.setItem('tle_leads',JSON.stringify(v)); _lastLocalSave=Date.now(); if(USE_SUPABASE) SB.saveLeads(v); },
+  set leads(v){ localStorage.setItem('tle_leads',JSON.stringify(v)); _lastLocalSave=Date.now(); if(USE_SUPABASE) SB.saveLeads(v, DB._changedLeadIds||[]); DB._changedLeadIds=null; },
+  _changedLeadIds: null,
   // ── Tasks ──
   get tasks(){ try{return JSON.parse(localStorage.getItem('tle_tasks')||'[]')}catch(e){return[]} },
   set tasks(v){ localStorage.setItem('tle_tasks',JSON.stringify(v)); if(USE_SUPABASE) SB.saveTasks(v); },
@@ -1450,8 +1451,14 @@ const SB = {
         sbFetch('tle_settings', { select: '*', filters: ['limit=100'] }),
       ]);
       // Only overwrite localStorage if Supabase actually returned data
-      // Only overwrite local leads if we haven't written locally in last 15s (prevents poll undoing a fresh save)
-      if (leads && leads.length && (Date.now() - _lastLocalSave > 15000)) { localStorage.setItem('tle_leads', JSON.stringify(leads.map(r=>r.data))); }
+      // Smart pull: only overwrite if Supabase has MORE leads than local — never reduce count
+      if (leads && leads.length) {
+        const localLeads = JSON.parse(localStorage.getItem('tle_leads') || '[]');
+        if (leads.length > localLeads.length) {
+          localStorage.setItem('tle_leads', JSON.stringify(leads.map(r=>r.data)));
+          toast('📥 ' + (leads.length - localLeads.length) + ' new lead(s) synced');
+        }
+      }
       if (tasks    && tasks.length)    { localStorage.setItem('tle_tasks',    JSON.stringify(tasks.map(r=>r.data))); }
       if (calls    && calls.length)    { localStorage.setItem('tle_calls',    JSON.stringify(calls.map(r=>r.data))); }
       if (notes    && notes.length)    { localStorage.setItem('tle_notes',    JSON.stringify(notes.map(r=>r.data))); }
@@ -1499,7 +1506,17 @@ const SB = {
   },
 
   // Incremental saves (called automatically by DB setters)
-  async saveLeads(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_leads',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Lead save failed — check Supabase connection'); console.error(e); } },
+  async saveLeads(v, changedIds) {
+    if(!USE_SUPABASE) return;
+    setSyncStatus('syncing');
+    try {
+      const toSave = (changedIds && changedIds.length)
+        ? v.filter(l => changedIds.includes(l.id))
+        : (v.length <= 10 ? v : v.slice(-1));
+      if(toSave.length) await sbFetch('tle_leads',{method:'POST',body:toSave.map(d=>({id:d.id,data:d})),upsert:true});
+      setSyncStatus('ok');
+    } catch(e) { setSyncStatus('error'); toast('❌ Save failed — use ⬆ Push in Settings'); console.error(e); }
+  },
   async saveTasks(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_tasks',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Task save failed'); console.error(e); } },
   async saveCalls(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_calls',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Call save failed'); console.error(e); } },
   async saveNotes(v)    { if(!USE_SUPABASE)return; setSyncStatus('syncing'); try{ if(v.length) await sbFetch('tle_notes',   {method:'POST',body:v.map(d=>({id:d.id,data:d})),upsert:true}); setSyncStatus('ok'); }catch(e){ setSyncStatus('error'); toast('❌ Note save failed'); console.error(e); } },
@@ -2284,16 +2301,22 @@ function saveLead(){
   if(editId){
     const idx=leads.findIndex(l=>l.id===+editId);
     if(idx>=0){leads[idx]={...leads[idx],...data};toast('Lead updated');}
+    DB._changedLeadIds=[+editId];
   }else{
     data.id=Date.now();leads.push(data);toast('Lead added');
+    DB._changedLeadIds=[data.id];
   }
   DB.leads=leads;closeModal('modal-lead');
   renderPage(currentActivePage());updateBadges();
 }
 function deleteLead(id){
   if(!confirm('Delete this lead?'))return;
-  DB.leads=getLeads().filter(l=>l.id!==id);
-  if(USE_SUPABASE) sbFetch('tle_leads',{method:'DELETE',filters:['id=eq.'+id]}).catch(e=>console.error('Delete from Supabase failed:',e));
+  const remaining=getLeads().filter(l=>l.id!==id);
+  localStorage.setItem('tle_leads',JSON.stringify(remaining));
+  _lastLocalSave=Date.now();
+  if(USE_SUPABASE) sbFetch('tle_leads',{method:'DELETE',filters:['id=eq.'+id]})
+    .then(()=>setSyncStatus('ok'))
+    .catch(e=>{setSyncStatus('error');console.error('Delete from Supabase failed:',e);});
   toast('Lead deleted');renderLeadsTable();updateBadges();
 }
 
