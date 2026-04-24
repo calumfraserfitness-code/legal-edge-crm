@@ -380,6 +380,7 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">Insights</div>
+    <button class="nav-item" id="nav-sales" onclick="showPage('sales')"><span class="nav-icon">💰</span>Sales</button>
     <button class="nav-item" onclick="showPage('reports')"><span class="nav-icon">▤</span>Reports</button>
     <button class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙</span>Settings</button>
   </div>
@@ -566,6 +567,11 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
     </div>
 
     <!-- REPORTS -->
+    <!-- SALES TRACKER PAGE -->
+    <div class="page" id="page-sales" style="overflow-y:auto;padding:0">
+      <div id="sales-page-inner" style="padding:24px 28px;max-width:1400px"></div>
+    </div>
+
     <div class="page" id="page-reports">
       <div class="report-grid" id="report-grid"></div>
     </div>
@@ -579,6 +585,8 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
           <div class="form-grid">
             <div class="form-group"><label class="form-label">Your Name</label><input class="form-input" id="settings-name" value="Calum"/></div>
             <div class="form-group"><label class="form-label">Role</label><select class="form-select" id="settings-role"><option value="owner">Owner (Full Access)</option><option value="va">VA (Limited Access)</option></select></div>
+            <div class="form-group"><label class="form-label">USD → EUR Rate <span style="font-size:10px;color:var(--text2)">(e.g. 0.92)</span></label><input class="form-input" id="settings-usd-rate" type="number" step="0.001" min="0.5" max="2" placeholder="0.92"/></div>
+            <div class="form-group"><label class="form-label">GBP → EUR Rate <span style="font-size:10px;color:var(--text2)">(e.g. 1.18)</span></label><input class="form-input" id="settings-gbp-rate" type="number" step="0.001" min="0.5" max="2" placeholder="1.18"/></div>
           </div>
           <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveSettings()">Save Settings</button></div>
         </div>
@@ -1280,6 +1288,7 @@ create policy "allow all" on tle_dial_lists    for all using (true) with check (
       <button class="detail-tab" onclick="switchTab(this,'tab-notes')">Notes</button>
       <button class="detail-tab" onclick="switchTab(this,'tab-tasks')">Tasks</button>
       <button class="detail-tab" onclick="switchTab(this,'tab-outreach')">Outreach</button>
+      <button class="detail-tab" id="tab-sales-btn" onclick="switchTab(this,'tab-sales')">💰 Sales</button>
     </div>
     <div id="tab-overview">
       <div class="detail-section" style="padding-bottom:10px">
@@ -1338,6 +1347,115 @@ create policy "allow all" on tle_dial_lists    for all using (true) with check (
         </div>
       </div>
     </div>
+
+    <!-- SALES TAB (Owner only) -->
+    <div id="tab-sales" style="display:none">
+      <div class="detail-section">
+        <div class="section-header" style="margin-bottom:14px">
+          <div class="section-title" style="font-size:13px">💰 Sales Data</div>
+          <span style="font-size:11px;color:var(--text2)">Owner only</span>
+        </div>
+        <!-- Call outcome checkboxes -->
+        <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Call Tracking</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-firstBooked" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--navy)">
+            <span>1st Call Booked</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-firstTaken" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--navy)">
+            <span>1st Call Taken</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-secondBooked" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--navy)">
+            <span>2nd Call Booked</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-secondTaken" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--navy)">
+            <span>2nd Call Taken</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-rescheduled" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--warn)">
+            <span>Rescheduled</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-cancelled" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:#dc2626">
+            <span>Cancelled</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-ghosted" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:#dc2626">
+            <span>Ghosted</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-wecancelled" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--text2)">
+            <span>We Cancelled</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-pitched" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--navy)">
+            <span>Pitched</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-ica" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--navy)">
+            <span>ICA</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-offer" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--gold)">
+            <span>Offer Made</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" id="sd-closed" onchange="saveSaleData()" style="width:16px;height:16px;accent-color:var(--success)">
+            <span style="font-weight:700;color:var(--success)">✅ CLOSED</span>
+          </label>
+        </div>
+        <!-- Revenue fields -->
+        <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Revenue</div>
+        <div style="margin-bottom:10px">
+          <label class="form-label">Currency</label>
+          <div style="display:flex;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:7px 14px;border-radius:6px;border:2px solid var(--border);flex:1;justify-content:center" id="cur-eur-wrap">
+              <input type="radio" name="sd-currency" id="sd-currency-eur" value="EUR" onchange="saveSaleData()" style="accent-color:var(--navy)"> € EUR
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:7px 14px;border-radius:6px;border:2px solid var(--border);flex:1;justify-content:center" id="cur-usd-wrap">
+              <input type="radio" name="sd-currency" id="sd-currency-usd" value="USD" onchange="saveSaleData()" style="accent-color:var(--navy)"> $ USD
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:7px 14px;border-radius:6px;border:2px solid var(--border);flex:1;justify-content:center" id="cur-gbp-wrap">
+              <input type="radio" name="sd-currency" id="sd-currency-gbp" value="GBP" onchange="saveSaleData()" style="accent-color:var(--navy)"> £ GBP
+            </label>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Revenue</label>
+            <input class="form-input" id="sd-revenue" type="number" placeholder="0" step="0.01" onchange="saveSaleData()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Cash Collected</label>
+            <input class="form-input" id="sd-cash" type="number" placeholder="0" step="0.01" onchange="saveSaleData()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">LTV</label>
+            <input class="form-input" id="sd-ltv" type="number" placeholder="0" step="0.01" onchange="saveSaleData()">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Close Date</label>
+            <input class="form-input" id="sd-closedate" type="date" onchange="saveSaleData()">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label class="form-label">Sale Notes / Objections</label>
+          <textarea class="form-textarea" id="sd-salenotes" style="min-height:60px" onchange="saveSaleData()" oninput="saveSaleData()"></textarea>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:16px">Changes auto-save when you update a field.</div>
+        <div class="detail-divider"></div>
+        <!-- Danger zone -->
+        <div style="margin-top:16px">
+          <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Danger Zone</div>
+          <button class="btn btn-sm" onclick="confirmDeleteCurrentLead()" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-weight:700">🗑 Delete This Lead Permanently</button>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">This removes the lead from both your device and Supabase. Cannot be undone.</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1444,7 +1562,18 @@ const SB = {
     setSyncStatus('syncing');
     try {
       const [leads, tasks, calls, notes, settings] = await Promise.all([
-        sbFetch('tle_leads',    { select: '*', filters: ['limit=10000'] }),
+        // Paginate leads — Supabase server cap is 1000 rows per request
+        (async()=>{
+          const hdrs={'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+          let all=[],off=0;
+          while(true){
+            const res=await fetch(`${SUPABASE_URL}/rest/v1/tle_leads?select=*&limit=1000&offset=${off}`,{headers:hdrs});
+            const rows=await res.json();
+            if(!Array.isArray(rows)||!rows.length) break;
+            all=all.concat(rows); if(rows.length<1000) break; off+=1000;
+          }
+          return all;
+        })(),
         sbFetch('tle_tasks',    { select: '*', filters: ['limit=10000'] }),
         sbFetch('tle_calls',    { select: '*', filters: ['limit=10000'] }),
         sbFetch('tle_notes',    { select: '*', filters: ['limit=10000'] }),
@@ -1605,11 +1734,15 @@ const PER_PAGE = 50;
 const pageTitles = {
   dashboard:'Dashboard',leads:'Leads Database',pipeline:'Pipeline Board',
   opportunities:'Opportunities',smartviews:'Smart Views',dialblocks:'Dial Blocks',
-  tasks:'Tasks & Follow-Ups',outreach:'Outreach',nurture:'Nurture',reports:'Reports',settings:'Settings',vaguide:'VA Guide'
+  tasks:'Tasks & Follow-Ups',outreach:'Outreach',nurture:'Nurture',sales:'Sales Tracker',reports:'Reports',settings:'Settings',vaguide:'VA Guide'
 };
 function showPage(name){
   const s = DB.settings;
   if(s.role==='va' && name==='reports') return;
+  if(s.role==='va' && name==='sales') return;
+  // Hide sales nav from VA
+  const salesNav=document.getElementById('nav-sales');
+  if(salesNav) salesNav.style.display=(s.role==='va'?'none':'');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const page = document.getElementById('page-'+name);
@@ -1630,6 +1763,7 @@ function renderPage(name){
   else if(name==='tasks') renderTasks();
   else if(name==='outreach') renderOutreach();
   else if(name==='nurture') renderNurture();
+  else if(name==='sales') renderSalesTracker();
   else if(name==='reports') renderReports();
   else if(name==='settings') renderSettings();
   updateBadges();
@@ -2108,6 +2242,157 @@ function renderNurture(){
 // ═══════════════════════════════════════════════════════════
 // REPORTS
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// SALES TRACKER PAGE
+// ═══════════════════════════════════════════════════════════
+function renderSalesTracker(){
+  if(DB.settings.role==='va'){document.getElementById('sales-page-inner').innerHTML='<div style="padding:60px;color:var(--text2)">Restricted.</div>';return;}
+  const leads=getLeads();
+  const s=DB.settings;
+  const USD_RATE=+(s.usdRate||0.92);
+  const GBP_RATE=+(s.gbpRate||1.18);
+  // Convert any amount to EUR
+  function toEUR(n,cur){ const v=+n||0; if(cur==='USD') return v*USD_RATE; if(cur==='GBP') return v*GBP_RATE; return v; }
+  function fmtEUR(n){ return '€'+Math.round(n).toLocaleString('en-IE'); }
+  function symFor(cur){return cur==='USD'?'$':cur==='GBP'?'£':'€';}
+
+  // Funnel counts
+  const n1stBooked=leads.filter(l=>l.firstBooked).length;
+  const nRescheduled=leads.filter(l=>l.rescheduled).length;
+  const nCancelled=leads.filter(l=>l.cancelled).length;
+  const nGhosted=leads.filter(l=>l.ghosted).length;
+  const nWeCancelled=leads.filter(l=>l.weCancelled).length;
+  const n1stTaken=leads.filter(l=>l.firstTaken).length;
+  const nICA=leads.filter(l=>l.ica).length;
+  const nOffer=leads.filter(l=>l.offer).length;
+  const closedLeads=leads.filter(l=>l.saleClose);
+  const nClosed=closedLeads.length;
+  const closePct=n1stTaken>0?((nClosed/n1stTaken)*100).toFixed(1):0;
+
+  // All amounts converted to EUR
+  const totalRevEUR=closedLeads.reduce((a,l)=>a+toEUR(l.saleRevenue,l.saleCurrency),0);
+  const totalCashEUR=closedLeads.reduce((a,l)=>a+toEUR(l.saleCash,l.saleCurrency),0);
+  const totalLtvEUR=closedLeads.reduce((a,l)=>a+toEUR(l.saleLtv,l.saleCurrency),0);
+  const perBooked=n1stBooked>0?totalRevEUR/n1stBooked:0;
+  const perTaken=n1stTaken>0?totalRevEUR/n1stTaken:0;
+  const ltvPerBooked=n1stBooked>0?totalLtvEUR/n1stBooked:0;
+  const cashPerSale=nClosed>0?totalCashEUR/nClosed:0;
+
+  // Leads with any sales activity
+  const activeLeads=leads.filter(l=>l.firstBooked||l.firstTaken||l.saleClose||l.saleRevenue);
+  const tableLeads=[...activeLeads].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+  document.getElementById('sales-page-inner').innerHTML=`
+    <div style="margin-bottom:22px">
+      <div style="font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:var(--navy);margin-bottom:4px">💰 Sales Tracker</div>
+      <div style="font-size:13px;color:var(--text2)">All amounts in <strong>€ EUR</strong>. USD/GBP auto-converted. Rate: 1 USD = ${USD_RATE} EUR · 1 GBP = ${GBP_RATE} EUR · <button class="btn btn-ghost btn-sm" onclick="showPage('settings')" style="font-size:11px;padding:2px 8px">Update rates in Settings</button></div>
+    </div>
+
+    <!-- Summary Stats Bar -->
+    <div class="card" style="margin-bottom:20px;border:2px solid var(--gold)">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Running Totals</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:900px">
+          <thead>
+            <tr>
+              ${['1st Booked','Rescheduled','Cancelled','Ghosted','We Cancelled','1st Taken','ICA','Offer','Closed','Revenue','Cash','LTV','Per Booked','Per Taken','LTV/Booked','Cash/Sale','Close %']
+                .map(h=>`<th style="padding:8px 10px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;text-align:center;white-space:nowrap">${h}</th>`)
+                .join('')}
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:var(--bg2);font-weight:700">
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--navy)">${n1stBooked}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--warn)">${nRescheduled}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--error)">${nCancelled}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--error)">${nGhosted}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--text2)">${nWeCancelled}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--navy)">${n1stTaken}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--navy)">${nICA}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--warn)">${nOffer}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:var(--success)">${nClosed}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--success);font-weight:700">${totalRevEUR>0?fmtEUR(totalRevEUR):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--success);font-weight:700">${totalCashEUR>0?fmtEUR(totalCashEUR):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--gold);font-weight:700">${totalLtvEUR>0?fmtEUR(totalLtvEUR):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--navy);font-weight:700">${n1stBooked>0?fmtEUR(perBooked):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--navy);font-weight:700">${n1stTaken>0?fmtEUR(perTaken):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--gold);font-weight:700">${n1stBooked>0?fmtEUR(ltvPerBooked):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:14px;color:var(--success);font-weight:700">${nClosed>0?fmtEUR(cashPerSale):'—'}</td>
+              <td style="padding:10px;text-align:center;font-size:16px;color:${nClosed>0?'var(--success)':'var(--text2)'};font-weight:700">${closePct}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Per-person table -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="table-toolbar" style="margin-bottom:14px">
+        <span class="section-title">Per-Lead Breakdown</span>
+        <span style="font-size:12px;color:var(--text2)">${tableLeads.length} leads with call/sales activity · <button class="btn btn-ghost btn-sm" onclick="renderSalesAllLeads()" id="btn-show-all-sales">Show all ${leads.length} leads</button></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px" id="sales-leads-table">
+          <thead>
+            <tr style="background:var(--bg2)">
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;white-space:nowrap;position:sticky;left:0;background:var(--bg2)">Name</th>
+              ${['1st Booked','Rescheduled','Cancelled','Ghosted','We Cancelled','1st Taken','ICA','Offer','Closed','Revenue','Cash','LTV','Close Date','Notes']
+                .map(h=>`<th style="padding:8px 10px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;text-align:center;white-space:nowrap">${h}</th>`)
+                .join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableLeads.map((l,i)=>salesRow(l,i)).join('')}
+            ${tableLeads.length===0?`<tr><td colspan="15" style="padding:32px;text-align:center;color:var(--text2)">No sales activity yet. Open a lead → 💰 Sales tab to start tracking.</td></tr>`:''}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+function salesRow(l,i){
+  const bg=i%2===0?'#fff':'var(--bg2)';
+  const cur=l.saleCurrency||'EUR';
+  const sym=cur==='USD'?'$':cur==='GBP'?'£':'€';
+  const s=DB.settings;
+  const USD_R=+(s.usdRate||0.92), GBP_R=+(s.gbpRate||1.18);
+  function toE(n,c){ const v=+n||0; if(c==='USD') return v*USD_R; if(c==='GBP') return v*GBP_R; return v; }
+  const curBadge=cur==='EUR'?'':`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;background:${cur==='USD'?'#dbeafe':'#fef9c3'};color:${cur==='USD'?'#1d4ed8':'#854d0e'};margin-left:4px">${cur}</span>`;
+  function tick(val){return val?`<span style="color:var(--success);font-size:16px">✓</span>`:`<span style="color:var(--border)">—</span>`;}
+  function money(val){
+    if(!val) return `<span style="color:var(--border)">—</span>`;
+    const orig=`${sym}${(+val).toLocaleString('en-GB',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+    const eur=cur!=='EUR'?` <span style="font-size:10px;color:var(--text2)">(€${Math.round(toE(val,cur)).toLocaleString()})</span>`:'';
+    return `<span style="color:var(--success);font-weight:600">${orig}</span>${eur}`;
+  }
+  return `<tr style="background:${bg};cursor:pointer" onclick="openDetail(${l.id})" title="Click to open lead">
+    <td style="padding:8px 10px;font-weight:600;color:var(--navy);position:sticky;left:0;background:${bg};white-space:nowrap">${l.name}${curBadge}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.firstBooked)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.rescheduled)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.cancelled)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.ghosted)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.weCancelled)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.firstTaken)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.ica)}</td>
+    <td style="padding:8px 10px;text-align:center">${tick(l.offer)}</td>
+    <td style="padding:8px 10px;text-align:center">${l.saleClose?`<span style="background:#dcfce7;color:#16a34a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">CLOSED</span>`:`<span style="color:var(--border)">—</span>`}</td>
+    <td style="padding:8px 10px;text-align:center">${money(l.saleRevenue)}</td>
+    <td style="padding:8px 10px;text-align:center">${money(l.saleCash)}</td>
+    <td style="padding:8px 10px;text-align:center">${money(l.saleLtv)}</td>
+    <td style="padding:8px 10px;text-align:center;font-size:11px;color:var(--text2)">${l.closeDate||'—'}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text2);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.saleNotes||'—'}</td>
+  </tr>`;
+}
+function renderSalesAllLeads(){
+  // Rebuild table with ALL leads
+  const leads=getLeads();
+  const tbl=document.getElementById('sales-leads-table');
+  const btn=document.getElementById('btn-show-all-sales');
+  if(!tbl)return;
+  const sortedLeads=[...leads].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  tbl.querySelector('tbody').innerHTML=sortedLeads.map((l,i)=>salesRow(l,i)).join('');
+  if(btn){btn.textContent='Showing all '+leads.length+' leads';btn.disabled=true;}
+}
 function renderReports(){
   if(DB.settings.role==='va'){document.getElementById('report-grid').innerHTML='<div style="padding:60px;color:var(--text2)">Restricted.</div>';return;}
   const leads=getLeads();
@@ -2132,11 +2417,37 @@ function renderReports(){
           <div class="chart-val">${v}</div>
         </div>`).join('')}</div></div>`;
   }
+  // ── Revenue / Sales metrics ──
   const totalDeal=leads.reduce((a,l)=>a+(+l.dealValue||0),0);
   const totalRev=leads.reduce((a,l)=>a+(+l.revenue||0),0);
   const wonLeads=leads.filter(l=>l.stage==='Won');
   const wonRev=wonLeads.reduce((a,l)=>a+(+l.dealValue||0),0);
+  // Sales tracking fields
+  const nBooked=leads.filter(l=>l.firstBooked).length;
+  const nTaken=leads.filter(l=>l.firstTaken).length;
+  const n2ndBooked=leads.filter(l=>l.secondBooked).length;
+  const n2ndTaken=leads.filter(l=>l.secondTaken).length;
+  const closedLeads=leads.filter(l=>l.saleClose);
+  const nClosed=closedLeads.length;
+  const totalSaleRev=closedLeads.reduce((a,l)=>a+(+l.saleRevenue||0),0);
+  const totalSaleCash=closedLeads.reduce((a,l)=>a+(+l.saleCash||0),0);
+  const totalSaleLtv=closedLeads.reduce((a,l)=>a+(+l.saleLtv||0),0);
+  const closePct=nTaken>0?((nClosed/nTaken)*100).toFixed(1):0;
+  const perBooked=nBooked>0?(totalSaleRev/nBooked):0;
+  const perTaken=nTaken>0?(totalSaleRev/nTaken):0;
+  const ltvPerBooked=nBooked>0?(totalSaleLtv/nBooked):0;
+  const cashPerSale=nClosed>0?(totalSaleCash/nClosed):0;
+  const _s=DB.settings, _uR=+(_s.usdRate||0.92), _gR=+(_s.gbpRate||1.18);
+  function toEUR_r(n,cur){ const v=+n||0; if(cur==='USD')return v*_uR; if(cur==='GBP')return v*_gR; return v; }
+  function fmt(n,cur){const v=toEUR_r(n,cur);return v>=1000?'€'+Math.round(v).toLocaleString():'€'+(v).toFixed(0);}
+  function statCell(label,val,color='var(--navy)'){
+    return `<div style="text-align:center;padding:12px 8px;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">${label}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:${color}">${val}</div>
+    </div>`;
+  }
   document.getElementById('report-grid').innerHTML=`
+    <!-- Lead overview -->
     <div class="card" style="grid-column:1/-1">
       <div class="table-toolbar" style="gap:20px">
         <div><div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Total Leads</div><div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy)">${leads.length}</div></div>
@@ -2147,6 +2458,55 @@ function renderReports(){
         <div><div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">With Phone</div><div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--navy)">${leads.filter(l=>l.phone).length}</div></div>
       </div>
     </div>
+
+    <!-- REVENUE & SALES PERFORMANCE (Owner only) -->
+    <div class="card" style="grid-column:1/-1;border:2px solid var(--gold)">
+      <div class="table-toolbar" style="margin-bottom:16px">
+        <span class="section-title" style="font-size:15px">💰 Revenue &amp; Sales Performance</span>
+        <span style="font-size:11px;color:var(--text2)">Owner only — update per lead via the 💰 Sales tab</span>
+      </div>
+      <!-- Call funnel -->
+      <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Call Funnel</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:20px">
+        ${statCell('1st Booked',nBooked,'var(--navy)')}
+        ${statCell('1st Taken',nTaken,'var(--navy)')}
+        ${statCell('2nd Booked',n2ndBooked,'var(--navy)')}
+        ${statCell('2nd Taken',n2ndTaken,'var(--navy)')}
+        ${statCell('Closed',nClosed,'var(--success)')}
+        ${statCell('Close %',closePct+'%',nClosed>0?'var(--success)':'var(--text2)')}
+      </div>
+      <!-- Revenue metrics -->
+      <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Revenue Metrics</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:20px">
+        ${statCell('Total Revenue',closedLeads.reduce((a,l)=>a+toEUR_r(l.saleRevenue,l.saleCurrency),0)>0?'€'+Math.round(closedLeads.reduce((a,l)=>a+toEUR_r(l.saleRevenue,l.saleCurrency),0)).toLocaleString():'—','var(--success)')}
+        ${statCell('Total Cash',closedLeads.reduce((a,l)=>a+toEUR_r(l.saleCash,l.saleCurrency),0)>0?'€'+Math.round(closedLeads.reduce((a,l)=>a+toEUR_r(l.saleCash,l.saleCurrency),0)).toLocaleString():'—','var(--success)')}
+        ${statCell('Total LTV',closedLeads.reduce((a,l)=>a+toEUR_r(l.saleLtv,l.saleCurrency),0)>0?'€'+Math.round(closedLeads.reduce((a,l)=>a+toEUR_r(l.saleLtv,l.saleCurrency),0)).toLocaleString():'—','var(--gold)')}
+      </div>
+      <!-- Per-call metrics -->
+      <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Per-Call Efficiency (see Sales page for full breakdown)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+        ${statCell('Close %',closePct+'%',nClosed>0?'var(--success)':'var(--text2)')}
+        ${statCell('Closed',nClosed,'var(--success)')}
+        ${statCell('1st Booked',nBooked,'var(--navy)')}
+        ${statCell('1st Taken',nTaken,'var(--navy)')}
+      </div>
+      ${nClosed>0?`
+      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Closed Clients</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${closedLeads.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+            <span style="font-weight:600">${l.name}</span>
+            <span style="display:flex;gap:12px">
+              ${l.saleRevenue?`<span style="color:var(--success)">Rev: ${fmt(l.saleRevenue,l.saleCurrency)}</span>`:''}
+              ${l.saleCash?`<span style="color:var(--navy)">Cash: ${fmt(l.saleCash,l.saleCurrency)}</span>`:''}
+              ${l.saleLtv?`<span style="color:var(--gold)">LTV: ${fmt(l.saleLtv,l.saleCurrency)}</span>`:''}
+              ${l.closeDate?`<span style="color:var(--text2)">${l.closeDate}</span>`:''}
+            </span>
+          </div>`).join('')}
+        </div>
+      </div>`:''}
+    </div>
+
     ${barChart('Leads by Pipeline',pipeMap,'',5)}
     ${barChart('Leads by Role',roleMap,'gold',8)}
     ${barChart('Leads by Country',countryMap,'',5)}
@@ -2170,6 +2530,8 @@ function renderSettings(){
   const s=DB.settings;
   document.getElementById('settings-name').value=s.name||'Calum';
   document.getElementById('settings-role').value=s.role||'owner';
+  document.getElementById('settings-usd-rate').value=s.usdRate||0.92;
+  document.getElementById('settings-gbp-rate').value=s.gbpRate||1.18;
   const leads=getLeads();
   document.getElementById('settings-stats').innerHTML=`
     Total leads: <strong>${leads.length}</strong><br>
@@ -2221,6 +2583,8 @@ function saveSettings(){
   const s=DB.settings;
   s.name=document.getElementById('settings-name').value;
   s.role=document.getElementById('settings-role').value;
+  s.usdRate=parseFloat(document.getElementById('settings-usd-rate').value)||0.92;
+  s.gbpRate=parseFloat(document.getElementById('settings-gbp-rate').value)||1.18;
   DB.settings=s;
   updateUserProfile();
   toast('Settings saved');
@@ -2300,7 +2664,12 @@ function saveLead(){
   };
   if(editId){
     const idx=leads.findIndex(l=>l.id===+editId);
-    if(idx>=0){leads[idx]={...leads[idx],...data};toast('Lead updated');}
+    if(idx>=0){
+      // Preserve sale data fields — only overwrite non-sale fields
+      const {firstBooked,firstTaken,secondBooked,secondTaken,pitched,saleClose,saleRevenue,saleCash,saleLtv,closeDate,saleNotes,...existingNonSale}=leads[idx];
+      leads[idx]={...leads[idx],...data};
+      toast('Lead updated');
+    }
     DB._changedLeadIds=[+editId];
   }else{
     data.id=Date.now();leads.push(data);toast('Lead added');
@@ -2318,6 +2687,58 @@ function deleteLead(id){
     .then(()=>setSyncStatus('ok'))
     .catch(e=>{setSyncStatus('error');console.error('Delete from Supabase failed:',e);});
   toast('Lead deleted');renderLeadsTable();updateBadges();
+}
+function confirmDeleteCurrentLead(){
+  if(!currentLeadId)return;
+  const l=getLeads().find(l=>l.id===currentLeadId);
+  if(!l)return;
+  const name=l.name||'this lead';
+  if(!confirm(`⚠️ PERMANENTLY DELETE "${name}"?\n\nThis will remove them from your device and Supabase. This cannot be undone.\n\nClick OK to confirm deletion.`))return;
+  closeDetail();
+  const remaining=getLeads().filter(x=>x.id!==currentLeadId);
+  localStorage.setItem('tle_leads',JSON.stringify(remaining));
+  _lastLocalSave=Date.now();
+  if(USE_SUPABASE) sbFetch('tle_leads',{method:'DELETE',filters:['id=eq.'+currentLeadId]})
+    .then(()=>setSyncStatus('ok'))
+    .catch(e=>{setSyncStatus('error');console.error('Delete from Supabase failed:',e);});
+  toast('🗑 Lead deleted permanently');
+  renderPage(currentActivePage());updateBadges();
+}
+function saveSaleData(){
+  if(!currentLeadId)return;
+  const leads=getLeads();
+  const idx=leads.findIndex(l=>l.id===currentLeadId);
+  if(idx<0)return;
+  leads[idx].firstBooked=document.getElementById('sd-firstBooked').checked;
+  leads[idx].firstTaken=document.getElementById('sd-firstTaken').checked;
+  leads[idx].secondBooked=document.getElementById('sd-secondBooked').checked;
+  leads[idx].secondTaken=document.getElementById('sd-secondTaken').checked;
+  leads[idx].rescheduled=document.getElementById('sd-rescheduled').checked;
+  leads[idx].cancelled=document.getElementById('sd-cancelled').checked;
+  leads[idx].ghosted=document.getElementById('sd-ghosted').checked;
+  leads[idx].weCancelled=document.getElementById('sd-wecancelled').checked;
+  leads[idx].pitched=document.getElementById('sd-pitched').checked;
+  leads[idx].ica=document.getElementById('sd-ica').checked;
+  leads[idx].offer=document.getElementById('sd-offer').checked;
+  leads[idx].saleClose=document.getElementById('sd-closed').checked;
+  leads[idx].saleRevenue=parseFloat(document.getElementById('sd-revenue').value)||0;
+  leads[idx].saleCash=parseFloat(document.getElementById('sd-cash').value)||0;
+  leads[idx].saleLtv=parseFloat(document.getElementById('sd-ltv').value)||0;
+  leads[idx].closeDate=document.getElementById('sd-closedate').value||'';
+  leads[idx].saleNotes=document.getElementById('sd-salenotes').value||'';
+  const selCur=document.querySelector('input[name="sd-currency"]:checked');
+  leads[idx].saleCurrency=selCur?selCur.value:'EUR';
+  // Update currency button highlight
+  ['eur','usd','gbp'].forEach(c=>{
+    const w=document.getElementById('cur-'+c+'-wrap');
+    const active=leads[idx].saleCurrency.toLowerCase()===c;
+    if(w){w.style.borderColor=active?'var(--navy)':'var(--border)';w.style.background=active?'#eef2ff':'';}
+  });
+  // If closed, auto-set stage to Won
+  if(leads[idx].saleClose && leads[idx].stage!=='Won') leads[idx].stage='Won';
+  DB._changedLeadIds=[currentLeadId];
+  DB.leads=leads;
+  toast('💰 Sales data saved');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2379,6 +2800,38 @@ function openDetail(id){
       <div class="task-content"><div class="task-title ${t.done?'done':''}">${t.title}</div>
       <div class="task-meta"><span class="task-due upcoming">${t.due}</span></div></div>
     </div>`).join(''):'<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-text">No tasks</div></div>';
+  // Sales tab — owner only
+  const salesBtn=document.getElementById('tab-sales-btn');
+  if(salesBtn) salesBtn.style.display=isVA?'none':'';
+  if(!isVA){
+    document.getElementById('sd-firstBooked').checked=!!l.firstBooked;
+    document.getElementById('sd-firstTaken').checked=!!l.firstTaken;
+    document.getElementById('sd-secondBooked').checked=!!l.secondBooked;
+    document.getElementById('sd-secondTaken').checked=!!l.secondTaken;
+    document.getElementById('sd-rescheduled').checked=!!l.rescheduled;
+    document.getElementById('sd-cancelled').checked=!!l.cancelled;
+    document.getElementById('sd-ghosted').checked=!!l.ghosted;
+    document.getElementById('sd-wecancelled').checked=!!l.weCancelled;
+    document.getElementById('sd-pitched').checked=!!l.pitched;
+    document.getElementById('sd-ica').checked=!!l.ica;
+    document.getElementById('sd-offer').checked=!!l.offer;
+    document.getElementById('sd-closed').checked=!!l.saleClose;
+    document.getElementById('sd-revenue').value=l.saleRevenue||'';
+    document.getElementById('sd-cash').value=l.saleCash||'';
+    document.getElementById('sd-ltv').value=l.saleLtv||'';
+    document.getElementById('sd-closedate').value=l.closeDate||'';
+    document.getElementById('sd-salenotes').value=l.saleNotes||'';
+    // Currency
+    const cur=l.saleCurrency||'EUR';
+    const curEl=document.getElementById('sd-currency-'+cur.toLowerCase());
+    if(curEl) curEl.checked=true;
+    // Highlight selected currency button
+    ['eur','usd','gbp'].forEach(c=>{
+      const w=document.getElementById('cur-'+c+'-wrap');
+      if(w) w.style.borderColor=c===cur.toLowerCase()?'var(--navy)':'var(--border)';
+      if(w) w.style.background=c===cur.toLowerCase()?'#eef2ff':'';
+    });
+  }
   switchTab(document.querySelector('.detail-tab'),'tab-overview');
   document.getElementById('detail-overlay').classList.add('open');
   document.getElementById('detail-panel').classList.add('open');
@@ -2391,7 +2844,7 @@ function closeDetail(){
 function switchTab(btn,tabId){
   document.querySelectorAll('.detail-tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
-  ['tab-overview','tab-calls','tab-notes','tab-tasks','tab-outreach'].forEach(id=>{
+  ['tab-overview','tab-calls','tab-notes','tab-tasks','tab-outreach','tab-sales'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display=id===tabId?'block':'none';
   });
 }
@@ -2666,6 +3119,66 @@ document.addEventListener('DOMContentLoaded',async ()=>{
         console.log('[Outreach] Seeded '+IMPORTED_MSG_EVENTS.length+' msg events');
       }
     }catch(e){}
+  })();
+
+  // ── Sales data migration v1 — seeds call/revenue data from CSV ──
+  (function(){
+    const VER='sales_v2';
+    if(localStorage.getItem('tle_sales_ver')===VER) return;
+    try{
+      const raw=localStorage.getItem('tle_leads');
+      const leads=raw?JSON.parse(raw):null;
+      if(!leads||!leads.length){ localStorage.setItem('tle_sales_ver',VER); return; }
+      // Data from "LEAD GEN TRACKER - 2PC - Running Order.csv"
+      const SALES=[
+        {email:'clane@cgrogansolicitors.com', name:'Micheal Joyce', firstBooked:true, rescheduled:true, firstTaken:true, ica:true, offer:true, pitched:true, saleNotes:'Think about it — wasn\'t solution or problem aware'},
+        {email:'clyng@tcd.ie', name:'Ciaran Lyng', firstBooked:true, firstTaken:true, ica:true, offer:true, saleNotes:'Left it on a bad note, didn\'t think he needed it'},
+        {email:'nickmoore2309@gmail.com', name:'Nicholas Moore', firstBooked:true, firstTaken:true, ica:true, saleNotes:'Didn\'t get on 2nd call, had everything figured out'},
+        {email:'sean98smith@hotmail.com', name:'Seán Smith', firstBooked:true, ghosted:true, firstTaken:true, ica:true, saleNotes:'Ghosted 2nd call'},
+        {email:'colmmckay95@gmail.com', name:'Colm Mckay', firstBooked:true, firstTaken:true, ica:true, offer:true, saleNotes:'No 2nd call — had no pitch deck at the time'},
+        {email:'neilmcgranaghan@gmail.com', name:'Neil McGranaghan', firstBooked:true, firstTaken:true, ica:true, offer:true, saleNotes:'Stopped me before price — said he can figure it out himself'},
+        {email:'evanlynch1999@gmail.com', name:'Evan Lynch', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleNotes:'Finances — 26, didn\'t have the money, will try himself, said he\'ll come back when earning more'},
+        {email:'j.groganwork@gmail.com', name:'John Grogan', firstBooked:true, firstTaken:true, ica:true, saleNotes:'Cancelled 2nd call — going to try a PT'},
+        {email:'neil.rafter@lawlibrary.ie', name:'Neil Rafter', firstBooked:true, firstTaken:true, ica:true, pitched:true, saleNotes:'Wanted just a training plan'},
+        {email:'evangfed@gmail.com', name:'Evan Fedrico', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleClose:true, saleRevenue:645, saleCash:645, saleLtv:645, saleCurrency:'USD', closeDate:'2024-11-07', saleNotes:'Closed — negotiated down to $125/month'},
+        {email:'darahiggins@gmail.com', name:'Dara Higgns', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleNotes:'Didn\'t think it was worth it, reached out again — no reply'},
+        {email:'felim.omaolmhana@gmail.com', name:'Felim Ó Maolmhána', firstBooked:true, firstTaken:true, ica:true, saleNotes:'Personal situations came up — follow up in 2026'},
+        {email:'aonghasm.keane@gmail.com', name:'Aonghus Keane', firstBooked:true, ghosted:true, firstTaken:true, ica:true, saleNotes:'Never messaged back after 1st call'},
+        {email:'kurt@forthmark.net', name:'Kurt Harris', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleClose:true, saleRevenue:2000, saleCash:2000, saleLtv:2000, saleCurrency:'USD', closeDate:'2024-11-21', saleNotes:'Closed'},
+        {email:'flambe16@clongowes.net', name:'Fiachra Lambe', firstBooked:true, rescheduled:true, firstTaken:true, offer:true, pitched:true, saleClose:true, saleRevenue:0, saleCash:0, saleLtv:0, saleCurrency:'EUR', closeDate:'2025-01-19', saleNotes:'Closed — first month free, then €200/month'},
+        {email:'jschutrum@gmail.com', name:'Johnathan Schutrum', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleClose:true, saleRevenue:2000, saleCash:2000, saleLtv:2000, saleCurrency:'USD', closeDate:'2025-02-08', saleNotes:'Closed'},
+        {email:'katerina.sheerin@gmail.com', name:'Katerina Sheerin', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleClose:true, saleRevenue:2000, saleCash:2000, saleLtv:2000, saleCurrency:'USD', closeDate:'2025-02-10', saleNotes:'Closed'},
+        {email:'emmetclarke44@ymail.com', name:'Emmett Clarke', firstBooked:true, firstTaken:true, ica:true, offer:true, pitched:true, saleClose:true, saleRevenue:1500, saleCash:1500, saleLtv:1500, saleCurrency:'USD', closeDate:'2025-02-21', saleNotes:'Closed'},
+      ];
+      const SALES_FIELDS=['firstBooked','rescheduled','cancelled','ghosted','weCancelled','firstTaken','ica','offer','pitched','saleClose','saleRevenue','saleCash','saleLtv','saleCurrency','closeDate','saleNotes'];
+      // Build email → sale data map
+      const emailMap={};
+      SALES.forEach(s=>{ if(s.email) emailMap[s.email.toLowerCase().trim()]=s; });
+      // Also build name map (first+last, lowercased)
+      const nameMap={};
+      SALES.forEach(s=>{ if(s.name) nameMap[s.name.toLowerCase().trim()]=s; });
+      const changedIds=[];
+      leads.forEach(l=>{
+        const byEmail=l.email?emailMap[l.email.toLowerCase().trim()]:null;
+        const byName=l.name?nameMap[l.name.toLowerCase().trim()]:null;
+        const src=byEmail||byName;
+        if(src){
+          SALES_FIELDS.forEach(k=>{ if(src[k]!==undefined) l[k]=src[k]; });
+          // Auto-set Won stage for closed leads
+          if(l.saleClose && l.stage!=='Won') l.stage='Won';
+          changedIds.push(l.id);
+        }
+      });
+      localStorage.setItem('tle_leads',JSON.stringify(leads));
+      localStorage.setItem('tle_sales_ver',VER);
+      // Push changed leads to Supabase
+      if(USE_SUPABASE && changedIds.length){
+        const toSync=leads.filter(l=>changedIds.includes(l.id));
+        sbFetch('tle_leads',{method:'POST',body:toSync.map(d=>({id:d.id,data:d})),upsert:true})
+          .catch(e=>console.error('[Sales migration] Supabase push failed:',e));
+      }
+      console.log('[Sales v1] Applied sales data to '+changedIds.length+' leads');
+    }catch(e){ console.error('[Sales] Migration failed:',e); }
   })();
 
   updateUserProfile();
