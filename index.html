@@ -532,7 +532,8 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
         <div class="table-toolbar">
           <span id="db-count" style="font-size:13px;font-weight:700;color:var(--navy)">0 leads</span>
           <span style="font-size:12px;color:var(--text2);margin-left:6px">in this dial block</span>
-          <button class="btn btn-ghost btn-sm" onclick="exportDialBlock()" style="margin-left:auto">↓ Export List</button>
+          <button class="btn btn-primary" onclick="openDialMode()" style="margin-left:auto;background:var(--navy);border-color:var(--navy);font-weight:700">▶ Start Dial Mode</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportDialBlock()">↓ Export</button>
         </div>
         <div class="table-wrap"><table><thead><tr>
           <th>#</th><th>Name</th><th style="font-size:12px;color:var(--gold);background:#fffdf5">📞 PHONE</th>
@@ -1200,6 +1201,121 @@ create policy "allow all" on tle_dial_lists    for all using (true) with check (
     <button class="btn btn-primary" onclick="saveLead()">Save Lead</button>
   </div>
 </div>
+</div>
+
+<!-- ═══════════════════ DIAL MODE OVERLAY ═══════════════════ -->
+<div id="dial-mode-overlay" style="display:none;position:fixed;inset:0;background:var(--navy);z-index:200;overflow-y:auto">
+  <div style="max-width:680px;margin:0 auto;padding:24px 20px 40px">
+
+    <!-- Top bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="dm-progress" style="font-size:13px;color:rgba(255,255,255,.6);font-weight:600">Lead 0 of 0</div>
+        <div id="dm-timer" style="font-family:monospace;font-size:13px;color:rgba(255,255,255,.5)">0:00</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="dialModeFinish()" style="padding:8px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.7);font-size:12px;cursor:pointer">✕ End Session</button>
+      </div>
+    </div>
+
+    <!-- Lead card -->
+    <div style="background:rgba(255,255,255,.07);border-radius:14px;padding:22px;margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+        <div>
+          <div id="dm-name" style="font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#fff;margin-bottom:4px">—</div>
+          <div id="dm-meta" style="font-size:13px;color:rgba(255,255,255,.6)">—</div>
+        </div>
+        <div style="text-align:right">
+          <div id="dm-calls-before" style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">Never called</div>
+          <div id="dm-stage-badge" style="font-size:11px;background:rgba(255,255,255,.1);border-radius:20px;padding:3px 10px;color:rgba(255,255,255,.7)">—</div>
+        </div>
+      </div>
+      <!-- BIG phone number -->
+      <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div id="dm-flag" style="font-size:28px;line-height:1">📞</div>
+        </div>
+        <div style="flex:1;padding:0 16px">
+          <div id="dm-phone-raw" style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:2px">original: —</div>
+          <a id="dm-phone-link" href="#" style="font-size:24px;font-weight:800;color:#fff;text-decoration:none;letter-spacing:1px;font-family:monospace">—</a>
+        </div>
+        <button onclick="copyDialPhone()" style="padding:8px 14px;background:rgba(255,255,255,.15);border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:12px">📋 Copy</button>
+      </div>
+      <!-- Email + LinkedIn quick links -->
+      <div id="dm-contact-links" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px"></div>
+    </div>
+
+    <!-- Recording section -->
+    <div style="background:rgba(255,255,255,.07);border-radius:14px;padding:18px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.07em">Recording &amp; Transcript</div>
+        <div id="dm-rec-status" style="font-size:11px;color:rgba(255,255,255,.4)">Not recording</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <button id="dm-rec-btn" onclick="toggleDialRecording()" style="flex:1;padding:12px;border-radius:10px;border:2px solid rgba(255,255,255,.2);background:rgba(255,0,0,.15);color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s">🔴 Record</button>
+        <button id="dm-transcribe-btn" onclick="toggleDialTranscription()" style="flex:1;padding:12px;border-radius:10px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:rgba(255,255,255,.7);font-size:13px;font-weight:700;cursor:pointer">🎙 Transcribe</button>
+        <label style="flex:1;padding:12px;border-radius:10px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:rgba(255,255,255,.7);font-size:13px;font-weight:700;cursor:pointer;text-align:center" title="Upload a recording file from your phone">📁 Upload<input type="file" accept="audio/*,video/*" onchange="uploadDialAudio(event)" style="display:none"></label>
+      </div>
+      <div id="dm-transcript-wrap" style="display:none">
+        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Live transcript (Chrome only)</div>
+        <div id="dm-transcript" style="background:rgba(0,0,0,.3);border-radius:8px;padding:12px;font-size:12px;color:rgba(255,255,255,.8);min-height:60px;line-height:1.6;white-space:pre-wrap"></div>
+      </div>
+      <div id="dm-audio-wrap" style="display:none;margin-top:10px">
+        <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Recording preview</div>
+        <audio id="dm-audio-player" controls style="width:100%;height:36px"></audio>
+      </div>
+    </div>
+
+    <!-- Outcome buttons -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Outcome <span style="font-weight:400;opacity:.6">(tap or press 1–6)</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <button class="dm-outcome-btn" data-val="No Answer" onclick="selectDialOutcome(this)" style="padding:14px 8px;border-radius:10px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s"><span style="display:block;font-size:20px;margin-bottom:4px">📵</span>No Answer<span style="display:block;font-size:10px;opacity:.5;margin-top:2px">[ 1 ]</span></button>
+        <button class="dm-outcome-btn" data-val="Left Voicemail" onclick="selectDialOutcome(this)" style="padding:14px 8px;border-radius:10px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s"><span style="display:block;font-size:20px;margin-bottom:4px">📱</span>Voicemail<span style="display:block;font-size:10px;opacity:.5;margin-top:2px">[ 2 ]</span></button>
+        <button class="dm-outcome-btn" data-val="Spoke Briefly" onclick="selectDialOutcome(this)" style="padding:14px 8px;border-radius:10px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s"><span style="display:block;font-size:20px;margin-bottom:4px">💬</span>Spoke<span style="display:block;font-size:10px;opacity:.5;margin-top:2px">[ 3 ]</span></button>
+        <button class="dm-outcome-btn" data-val="Booked Call" onclick="selectDialOutcome(this)" style="padding:14px 8px;border-radius:10px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s"><span style="display:block;font-size:20px;margin-bottom:4px">📅</span>Booked!<span style="display:block;font-size:10px;opacity:.5;margin-top:2px">[ 4 ]</span></button>
+        <button class="dm-outcome-btn" data-val="Not Interested" onclick="selectDialOutcome(this)" style="padding:14px 8px;border-radius:10px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s"><span style="display:block;font-size:20px;margin-bottom:4px">🚫</span>Not Int.<span style="display:block;font-size:10px;opacity:.5;margin-top:2px">[ 5 ]</span></button>
+        <button class="dm-outcome-btn" data-val="Call Back Later" onclick="selectDialOutcome(this)" style="padding:14px 8px;border-radius:10px;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s"><span style="display:block;font-size:20px;margin-bottom:4px">🔄</span>Call Back<span style="display:block;font-size:10px;opacity:.5;margin-top:2px">[ 6 ]</span></button>
+      </div>
+      <input type="hidden" id="dm-outcome" value="">
+    </div>
+
+    <!-- Notes + Follow-up -->
+    <div style="background:rgba(255,255,255,.07);border-radius:14px;padding:18px;margin-bottom:18px">
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">Notes <span style="opacity:.5;font-weight:400">(key points, objections, next steps)</span></label>
+        <textarea id="dm-notes" style="width:100%;min-height:90px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:13px;padding:10px;resize:vertical;font-family:inherit;line-height:1.5;box-sizing:border-box" placeholder="What happened? Objections raised? What's the plan?"></textarea>
+      </div>
+      <div id="dm-ai-summary-wrap" style="display:none;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.3);border-radius:8px;padding:10px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:4px">✨ AI Summary</div>
+        <div id="dm-ai-summary" style="font-size:12px;color:rgba(255,255,255,.8);line-height:1.6"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">Follow-Up Date</label>
+          <input type="date" id="dm-followup" style="width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:13px;padding:9px 10px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">Update Stage</label>
+          <select id="dm-stage" style="width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:12px;padding:9px 10px;box-sizing:border-box">
+            <option value="">No change</option>
+            <option>Attempted Contact</option><option>Contacted</option><option>First Call Booked</option>
+            <option>First Call No-Show</option><option>First Call Completed</option>
+            <option>Second Call Booked</option><option>Second Call Completed</option>
+            <option>Decision Pending</option><option>Won</option><option>Lost</option><option>Nurture</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:10px">
+      <button onclick="dialModeSkip()" style="padding:14px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-size:13px;font-weight:600;cursor:pointer;flex:0 0 auto">Skip →</button>
+      <button onclick="dialModeSaveNext()" style="flex:1;padding:16px;border-radius:10px;border:none;background:var(--gold);color:var(--navy);font-size:15px;font-weight:800;cursor:pointer">💾 Save &amp; Next →</button>
+      <button onclick="dialModeFinish()" style="padding:14px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-size:13px;font-weight:600;cursor:pointer;flex:0 0 auto">✓ Finish</button>
+    </div>
+
+  </div>
 </div>
 
 <!-- LOG CALL MODAL -->
@@ -2163,7 +2279,7 @@ function renderDialBlock(){
     <tr>
       <td style="color:var(--text2);font-weight:600;font-size:12px">${i+1}</td>
       <td class="td-name" onclick="openDetail(${l.id})" style="cursor:pointer">${l.name}</td>
-      <td style="background:#fffdf5"><span style="font-size:14px;font-weight:800;color:var(--navy2)">${l.phone?`<a href="tel:${l.phone}" style="color:inherit;text-decoration:none">${l.phone}</a>`:'<span style="color:var(--text2);font-size:12px">no phone</span>'}</span></td>
+      <td style="background:#fffdf5"><span style="font-size:13px;font-weight:800;color:var(--navy2);white-space:nowrap">${l.phone?`${flagForPhone(l.phone)} <a href="tel:${formatPhone(l.phone)}" style="color:inherit;text-decoration:none;font-family:monospace">${formatPhone(l.phone)}</a>`:'<span style="color:var(--text2);font-size:12px">no phone</span>'}</span></td>
       <td style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.email||'—'}</td>
       <td style="font-size:12px;color:var(--text2)">${l.role||'—'}</td>
       <td><span class="badge badge-stage" style="font-size:10px">${l.stage}</span></td>
@@ -2690,19 +2806,20 @@ function deleteLead(id){
 }
 function confirmDeleteCurrentLead(){
   if(!currentLeadId)return;
-  const l=getLeads().find(l=>l.id===currentLeadId);
+  const idToDelete=currentLeadId; // save BEFORE closeDetail() nulls it
+  const l=getLeads().find(l=>l.id===idToDelete);
   if(!l)return;
   const name=l.name||'this lead';
-  if(!confirm(`⚠️ PERMANENTLY DELETE "${name}"?\n\nThis will remove them from your device and Supabase. This cannot be undone.\n\nClick OK to confirm deletion.`))return;
-  closeDetail();
-  const remaining=getLeads().filter(x=>x.id!==currentLeadId);
+  if(!confirm(`⚠️ PERMANENTLY DELETE "${name}"?\n\nThis removes them from your device and Supabase. Cannot be undone.\n\nClick OK to confirm.`))return;
+  closeDetail(); // this nulls currentLeadId — fine, we saved idToDelete above
+  const remaining=getLeads().filter(x=>x.id!==idToDelete);
   localStorage.setItem('tle_leads',JSON.stringify(remaining));
   _lastLocalSave=Date.now();
-  if(USE_SUPABASE) sbFetch('tle_leads',{method:'DELETE',filters:['id=eq.'+currentLeadId]})
-    .then(()=>setSyncStatus('ok'))
-    .catch(e=>{setSyncStatus('error');console.error('Delete from Supabase failed:',e);});
-  toast('🗑 Lead deleted permanently');
-  renderPage(currentActivePage());updateBadges();
+  if(USE_SUPABASE) sbFetch('tle_leads',{method:'DELETE',filters:['id=eq.'+idToDelete]})
+    .then(()=>{ setSyncStatus('ok'); toast('🗑 Deleted from Supabase'); })
+    .catch(e=>{ setSyncStatus('error'); console.error('Supabase delete failed:',e); toast('⚠️ Deleted locally — Supabase delete failed, try Push in Settings'); });
+  toast('🗑 '+name+' deleted');
+  renderPage(currentActivePage()); updateBadges();
 }
 function saveSaleData(){
   if(!currentLeadId)return;
@@ -2785,7 +2902,10 @@ function openDetail(id){
         <span class="call-outcome-badge ${outcomeClass[c.outcome]||'outcome-noanswer'}">${c.outcome}</span>
         <span style="font-size:11px;color:var(--text2)">${c.date}${c.duration?' · '+c.duration+'min':''}</span>
       </div>
-      ${c.notes?`<div style="font-size:12px;color:var(--text)">${c.notes}</div>`:''}
+      ${c.notes?`<div style="font-size:12px;color:var(--text);margin-bottom:4px">${c.notes}</div>`:''}
+      ${c.transcript?`<div style="font-size:11px;color:var(--text2);background:var(--bg2);border-radius:6px;padding:6px 8px;margin-bottom:4px;border-left:3px solid var(--navy)"><span style="font-size:10px;font-weight:700;color:var(--navy);display:block;margin-bottom:3px">🎙 Transcript</span>${c.transcript.slice(0,300)}${c.transcript.length>300?'…':''}</div>`:''}
+      ${c.aiSummary?`<div style="font-size:11px;color:var(--text2);background:#fffbeb;border-radius:6px;padding:6px 8px;margin-bottom:4px;border-left:3px solid var(--gold)"><span style="font-size:10px;font-weight:700;color:var(--gold);display:block;margin-bottom:3px">✨ AI Summary</span>${c.aiSummary}</div>`:''}
+      ${c.audioId?`<div style="margin-top:4px"><audio controls style="width:100%;height:32px" id="audio-${c.audioId}"></audio><script>loadAudioForPlayer('audio-${c.audioId}','${c.audioId}');<\/script></div>`:''}
       ${c.followUp?`<div style="font-size:11px;color:var(--text2);margin-top:3px">📅 Next: ${c.followUp}</div>`:''}
     </div>`).join(''):'<div class="empty-state"><div class="empty-icon">📞</div><div class="empty-text">No calls logged yet.<br><span style=\"font-size:11px\">All current leads were contacted via LinkedIn only.</span></div></div>';
   // Notes
@@ -2861,6 +2981,372 @@ function addQuickNote(){
 }
 
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// PHONE FORMATTER
+// ═══════════════════════════════════════════════════════════
+function formatPhone(raw){
+  if(!raw) return '';
+  const d=raw.replace(/[\s\-\(\)\.]/g,'');
+  if(raw.trim().startsWith('+')) return raw.trim();
+  // 353 prefix → Irish
+  if(/^353\d{7,9}$/.test(d)) return '+353 '+d.slice(3);
+  // Irish mobile 08x → 9 digits starting 08
+  if(/^0[6-9]\d{7,8}$/.test(d)) return '+353 '+d.slice(1);
+  // 9 digits starting 6-9 (Irish mobile without leading 0 or 353)
+  if(/^[6-9]\d{8}$/.test(d)) return '+353 '+d;
+  // Irish landline 0x + 7-8 digits
+  if(/^0[1-9]\d{6,8}$/.test(d)) return '+353 '+d.slice(1);
+  // UK: 44 prefix
+  if(/^44\d{9,10}$/.test(d)) return '+44 '+d.slice(2);
+  // US: 11 digits starting 1
+  if(/^1\d{10}$/.test(d)) return '+1 ('+d.slice(1,4)+') '+d.slice(4,7)+'-'+d.slice(7);
+  return raw;
+}
+function flagForPhone(raw){
+  if(!raw) return '📞';
+  const d=raw.replace(/[\s\-\(\)\.+]/g,'');
+  if(/^(353|0[6-9]|0[1-5]|[6-9]\d{8})/.test(d)) return '🇮🇪';
+  if(/^44/.test(d)||raw.includes('+44')) return '🇬🇧';
+  if(/^1\d{10}/.test(d)||raw.includes('+1')) return '🇺🇸';
+  return '📞';
+}
+
+// ═══════════════════════════════════════════════════════════
+// INDEXEDDB AUDIO STORAGE
+// ═══════════════════════════════════════════════════════════
+const AudioDB=(()=>{
+  let db=null;
+  function open(){
+    return new Promise((res,rej)=>{
+      if(db){res(db);return;}
+      const req=indexedDB.open('tle_audio',1);
+      req.onupgradeneeded=e=>e.target.result.createObjectStore('clips',{keyPath:'id'});
+      req.onsuccess=e=>{db=e.target.result;res(db);};
+      req.onerror=()=>rej('IDB failed');
+    });
+  }
+  return {
+    save(id,blob){return open().then(d=>new Promise((res,rej)=>{const tx=d.transaction('clips','readwrite');tx.objectStore('clips').put({id,blob});tx.oncomplete=res;tx.onerror=rej;}));},
+    get(id){return open().then(d=>new Promise((res,rej)=>{const tx=d.transaction('clips','readonly');const req=tx.objectStore('clips').get(id);req.onsuccess=()=>res(req.result?.blob);req.onerror=rej;}));},
+    del(id){return open().then(d=>new Promise((res,rej)=>{const tx=d.transaction('clips','readwrite');tx.objectStore('clips').delete(id);tx.oncomplete=res;}));}
+  };
+})();
+function loadAudioForPlayer(elemId,audioId){
+  const el=document.getElementById(elemId);if(!el)return;
+  AudioDB.get(audioId).then(blob=>{
+    if(blob) el.src=URL.createObjectURL(blob);
+    else el.style.display='none';
+  }).catch(()=>{if(el)el.style.display='none';});
+}
+
+// ═══════════════════════════════════════════════════════════
+// DIAL MODE
+// ═══════════════════════════════════════════════════════════
+let _dmLeads=[], _dmIdx=0, _dmTimerInterval=null, _dmTimerSecs=0;
+let _dmMediaRec=null, _dmAudioChunks=[], _dmAudioBlob=null, _dmIsRecording=false, _dmPrewarmStream=null;
+let _dmRecognition=null, _dmTranscript='', _dmIsTranscribing=false;
+let _dmKeyHandler=null;
+
+function openDialMode(){
+  if(!dialBlockLeads||!dialBlockLeads.length){toast('No leads in dial block. Add filters first.');return;}
+  _dmLeads=dialBlockLeads.filter(l=>l.phone); // only leads with phones
+  if(!_dmLeads.length){toast('No leads with phone numbers in this block.');return;}
+  _dmIdx=0; _dmTranscript=''; _dmAudioBlob=null;
+  document.getElementById('dial-mode-overlay').style.display='block';
+  // Silently pre-warm mic permission so there's no popup when you hit Record
+  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({audio:true,video:false})
+      .then(s=>{ _dmPrewarmStream=s; })
+      .catch(()=>{ _dmPrewarmStream=null; });
+  }
+  document.body.style.overflow='hidden';
+  _loadDialLead();
+  _dmTimerSecs=0;
+  clearInterval(_dmTimerInterval);
+  _dmTimerInterval=setInterval(()=>{
+    _dmTimerSecs++;
+    const m=Math.floor(_dmTimerSecs/60),s=_dmTimerSecs%60;
+    const el=document.getElementById('dm-timer');
+    if(el) el.textContent=m+':'+(s<10?'0':'')+s;
+  },1000);
+  // Keyboard shortcuts
+  _dmKeyHandler=e=>{
+    if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT') return;
+    const k=e.key;
+    if(k==='1') selectDialOutcomeByVal('No Answer');
+    else if(k==='2') selectDialOutcomeByVal('Left Voicemail');
+    else if(k==='3') selectDialOutcomeByVal('Spoke Briefly');
+    else if(k==='4') selectDialOutcomeByVal('Booked Call');
+    else if(k==='5') selectDialOutcomeByVal('Not Interested');
+    else if(k==='6') selectDialOutcomeByVal('Call Back Later');
+    else if(k==='Enter'&&e.shiftKey) dialModeSaveNext();
+    else if(k==='ArrowRight') dialModeSkip();
+  };
+  document.addEventListener('keydown',_dmKeyHandler);
+}
+function _loadDialLead(){
+  const l=_dmLeads[_dmIdx];
+  if(!l) return;
+  const fmt=formatPhone(l.phone);
+  const flag=flagForPhone(l.phone);
+  document.getElementById('dm-progress').textContent='Lead '+(_dmIdx+1)+' of '+_dmLeads.length;
+  document.getElementById('dm-name').textContent=l.name||'—';
+  document.getElementById('dm-meta').textContent=[l.role,l.company,l.country].filter(Boolean).join(' · ')||'—';
+  document.getElementById('dm-flag').textContent=flag;
+  document.getElementById('dm-phone-raw').textContent='original: '+l.phone;
+  document.getElementById('dm-phone-link').textContent=fmt||l.phone;
+  document.getElementById('dm-phone-link').href='tel:'+(fmt||l.phone).replace(/\s/g,'');
+  document.getElementById('dm-stage-badge').textContent=l.stage||'—';
+  const prevCalls=DB.calls.filter(c=>c.leadId===l.id).length;
+  document.getElementById('dm-calls-before').textContent=prevCalls?'Called '+prevCalls+'x before':'Never called';
+  document.getElementById('dm-contact-links').innerHTML=[
+    l.email?`<a href="mailto:${l.email}" style="color:rgba(255,255,255,.6);font-size:12px;text-decoration:none;background:rgba(255,255,255,.1);padding:4px 10px;border-radius:20px">✉ ${l.email}</a>`:'',
+    l.linkedin?`<a href="${l.linkedin.startsWith('http')?l.linkedin:'https://'+l.linkedin}" target="_blank" style="color:rgba(255,255,255,.6);font-size:12px;text-decoration:none;background:rgba(255,255,255,.1);padding:4px 10px;border-radius:20px">🔗 LinkedIn</a>`:'',
+  ].join('');
+  // Reset form
+  document.getElementById('dm-outcome').value='';
+  document.getElementById('dm-notes').value='';
+  document.getElementById('dm-followup').value='';
+  document.getElementById('dm-stage').value='';
+  document.getElementById('dm-transcript').textContent='';
+  document.getElementById('dm-ai-summary-wrap').style.display='none';
+  document.getElementById('dm-audio-wrap').style.display='none';
+  document.querySelectorAll('.dm-outcome-btn').forEach(b=>{b.style.background='rgba(255,255,255,.07)';b.style.borderColor='rgba(255,255,255,.15)';});
+  _dmTranscript=''; _dmAudioBlob=null;
+  if(_dmIsRecording) _stopRecording().catch(()=>{});
+  if(_dmIsTranscribing) _stopTranscription();
+}
+function copyDialPhone(){
+  const txt=document.getElementById('dm-phone-link').textContent;
+  navigator.clipboard.writeText(txt).then(()=>toast('📋 Number copied')).catch(()=>{});
+}
+function selectDialOutcome(btn){
+  document.querySelectorAll('.dm-outcome-btn').forEach(b=>{b.style.background='rgba(255,255,255,.07)';b.style.borderColor='rgba(255,255,255,.15)';});
+  btn.style.background='rgba(212,175,55,.3)';btn.style.borderColor='var(--gold)';
+  document.getElementById('dm-outcome').value=btn.dataset.val;
+  // Auto-suggest stage
+  const stageMap={'No Answer':'Attempted Contact','Left Voicemail':'Attempted Contact','Spoke Briefly':'Contacted','Booked Call':'First Call Booked','Not Interested':'Lost','Call Back Later':'Nurture'};
+  const sug=stageMap[btn.dataset.val]||'';
+  if(sug) document.getElementById('dm-stage').value=sug;
+}
+function selectDialOutcomeByVal(val){
+  const btn=document.querySelector('.dm-outcome-btn[data-val="'+val+'"]');
+  if(btn) selectDialOutcome(btn);
+}
+async function dialModeSaveNext(){
+  const outcome=document.getElementById('dm-outcome').value;
+  if(!outcome){toast('Tap an outcome first');return;}
+  const l=_dmLeads[_dmIdx];
+  // Stop recording if active
+  if(_dmIsRecording) await _stopRecording();
+  if(_dmIsTranscribing) _stopTranscription();
+  // Save audio to IndexedDB
+  let audioId=null;
+  if(_dmAudioBlob){
+    audioId='audio_'+Date.now();
+    await AudioDB.save(audioId,_dmAudioBlob);
+  }
+  // Generate AI summary from transcript
+  let aiSummary='';
+  if(_dmTranscript&&_dmTranscript.length>30){
+    aiSummary=_generateCallSummary(_dmTranscript,document.getElementById('dm-notes').value);
+  }
+  const notes=document.getElementById('dm-notes').value.trim();
+  const calls=DB.calls;
+  calls.push({
+    id:Date.now(), leadId:l.id,
+    date:new Date().toISOString().split('T')[0],
+    duration:0, outcome,
+    notes: notes+(aiSummary?'\n\n[Summary: '+aiSummary+']':''),
+    transcript:_dmTranscript||'',
+    aiSummary,
+    audioId,
+    followUp:document.getElementById('dm-followup').value,
+    loggedFrom:'dialMode'
+  });
+  DB.calls=calls;
+  // Update lead
+  const leads=getLeads(); const idx=leads.findIndex(l2=>l2.id===l.id);
+  if(idx>=0){
+    leads[idx].lastContact=new Date().toISOString().split('T')[0];
+    const ns=document.getElementById('dm-stage').value;
+    if(ns) leads[idx].stage=ns;
+    const fu=document.getElementById('dm-followup').value;
+    if(fu) leads[idx].nextFollowUp=fu;
+    DB._changedLeadIds=[l.id]; DB.leads=leads;
+  }
+  toast('✓ Logged: '+outcome);
+  _dmIdx++;
+  if(_dmIdx>=_dmLeads.length){ dialModeFinish(true); return; }
+  _loadDialLead();
+  updateBadges();
+}
+function dialModeSkip(){
+  _dmIdx++;
+  if(_dmIdx>=_dmLeads.length){ toast('End of list'); dialModeFinish(); return; }
+  _loadDialLead();
+}
+function dialModeFinish(done){
+  clearInterval(_dmTimerInterval);
+  if(_dmIsRecording) _stopRecording().catch(()=>{});
+  if(_dmIsTranscribing) _stopTranscription();
+  document.getElementById('dial-mode-overlay').style.display='none';
+  document.body.style.overflow='';
+  if(_dmKeyHandler) document.removeEventListener('keydown',_dmKeyHandler);
+  renderPage(currentActivePage()); updateBadges();
+  if(done) toast('🎉 Dial session complete! '+_dmLeads.length+' leads worked.');
+  else toast('Dial session ended.');
+}
+
+// Recording
+async function toggleDialRecording(){
+  if(_dmIsRecording){ await _stopRecording(); return; }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    _showMicHelp('Your browser does not support microphone recording. Try Chrome or Edge.');
+    return;
+  }
+  try{
+    // Reuse pre-warmed stream if available, otherwise request fresh
+    const stream=(_dmPrewarmStream&&_dmPrewarmStream.active)
+      ? _dmPrewarmStream
+      : await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    _dmAudioChunks=[];
+    // Pick best supported format — Safari needs mp4, Chrome/Firefox prefer webm
+    const mimeType=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>{try{return MediaRecorder.isTypeSupported(t);}catch(e){return false;}})||'';
+    _dmMediaRec=new MediaRecorder(stream, mimeType?{mimeType}:{});
+    _dmMediaRec.ondataavailable=e=>{ if(e.data&&e.data.size>0) _dmAudioChunks.push(e.data); };
+    _dmMediaRec.onerror=e=>{ toast('Recording error'); _dmIsRecording=false; };
+    _dmMediaRec.start(1000);
+    _dmIsRecording=true;
+    const btn=document.getElementById('dm-rec-btn');
+    if(btn){btn.textContent='⏹ Stop Recording';btn.style.background='rgba(239,68,68,.5)';}
+    const st=document.getElementById('dm-rec-status');
+    if(st){st.textContent='● Recording…';st.style.color='#ef4444';}
+    // Auto-start transcription when recording begins
+    _startAutoTranscription();
+  }catch(e){
+    console.error('Mic error:',e);
+    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+      _showMicHelp('Microphone access blocked.\n\n🍎 Mac/Safari: System Settings → Privacy & Security → Microphone → allow Safari\n\n🔵 Chrome: Click the 🔒 lock icon in the address bar → Site Settings → Microphone → Allow\n\nThen reload the page and try again.');
+    } else if(e.name==='NotFoundError'){
+      _showMicHelp('No microphone found. Plug in headphones or check your Mac microphone in System Settings → Sound.');
+    } else {
+      _showMicHelp('Could not start recording: '+e.message+'\n\nTry reloading the page.');
+    }
+  }
+}
+function uploadDialAudio(e){
+  const file=e.target.files[0]; if(!file) return;
+  _dmAudioBlob=file;
+  const url=URL.createObjectURL(file);
+  const player=document.getElementById('dm-audio-player');
+  if(player){ player.src=url; document.getElementById('dm-audio-wrap').style.display='block'; }
+  const st=document.getElementById('dm-rec-status');
+  if(st){st.textContent='✓ Audio uploaded: '+file.name;st.style.color='#34d399';}
+  toast('✓ Recording uploaded');
+}
+function _showMicHelp(msg){
+  // Silent fallback — just reset the button and show upload option
+  const btn=document.getElementById('dm-rec-btn');
+  if(btn){btn.textContent='🔴 Start Recording';btn.style.background='';}
+  const st=document.getElementById('dm-rec-status');
+  if(st){st.textContent='Use 📁 Upload to attach a recording instead';st.style.color='#94a3b8';}
+}
+async function _stopRecording(){
+  if(!_dmIsRecording||!_dmMediaRec) return;
+  return new Promise(res=>{
+    _dmMediaRec.onstop=()=>{
+      const mimeType=_dmMediaRec.mimeType||'audio/webm';
+      _dmAudioBlob=new Blob(_dmAudioChunks,{type:mimeType});
+      const url=URL.createObjectURL(_dmAudioBlob);
+      const player=document.getElementById('dm-audio-player');
+      if(player){ player.src=url; document.getElementById('dm-audio-wrap').style.display='block'; }
+      _dmIsRecording=false;
+      const btn=document.getElementById('dm-rec-btn');
+      if(btn){btn.textContent='🔴 Record Again';btn.style.background='rgba(255,0,0,.15)';}
+      const st=document.getElementById('dm-rec-status');
+      if(st){st.textContent='✓ Recorded — '+Math.round(_dmAudioChunks.length)+' chunks saved';st.style.color='#34d399';}
+      _dmMediaRec.stream.getTracks().forEach(t=>t.stop());
+      // Auto-stop transcription and generate summary
+      _stopTranscription();
+      res();
+    };
+    _dmMediaRec.stop();
+  });
+}
+
+// Transcription (Web Speech API — Chrome/Edge, partial Safari support)
+function _startAutoTranscription(){
+  // Called automatically when recording starts
+  if(_dmIsTranscribing) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    const tw=document.getElementById('dm-transcript-wrap');
+    if(tw){ tw.style.display='block'; document.getElementById('dm-transcript').textContent='[Live transcription not available in this browser — transcript will be blank, but notes and recording still save normally]'; }
+    return;
+  }
+  _dmRecognition=new SR();
+  _dmRecognition.continuous=true; _dmRecognition.interimResults=true; _dmRecognition.lang='en-IE';
+  _dmRecognition.onresult=e=>{
+    let fin='',interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) fin+=e.results[i][0].transcript+' ';
+      else interim+=e.results[i][0].transcript;
+    }
+    if(fin) _dmTranscript+=fin;
+    const el=document.getElementById('dm-transcript');
+    if(el) el.textContent=_dmTranscript+(interim?'['+interim+']':'');
+  };
+  _dmRecognition.onerror=e=>{ if(e.error!=='no-speech'&&e.error!=='aborted') console.warn('Transcription:',e.error); };
+  _dmRecognition.onend=()=>{ if(_dmIsTranscribing&&_dmIsRecording){ try{_dmRecognition.start();}catch(e){} } }; // auto-restart if still recording
+  try{ _dmRecognition.start(); } catch(e){ return; }
+  _dmIsTranscribing=true;
+  const tw=document.getElementById('dm-transcript-wrap');
+  if(tw) tw.style.display='block';
+  const btn=document.getElementById('dm-transcribe-btn');
+  if(btn){btn.textContent='🎙 Transcribing…';btn.style.background='rgba(59,130,246,.3)';btn.style.borderColor='#3b82f6';}
+}
+function toggleDialTranscription(){
+  // Manual toggle button — still works if they want to control it
+  if(_dmIsTranscribing){ _stopTranscription(); return; }
+  _startAutoTranscription();
+}
+function _stopTranscription(){
+  _dmIsTranscribing=false;
+  if(_dmRecognition){ try{_dmRecognition.stop();}catch(e){} _dmRecognition=null; }
+  const btn=document.getElementById('dm-transcribe-btn');
+  if(btn){ btn.textContent='🎙 Transcribe'; btn.style.background='rgba(255,255,255,.07)'; btn.style.borderColor='rgba(255,255,255,.2)'; }
+  // Auto-generate AI summary once transcription stops
+  if(_dmTranscript&&_dmTranscript.length>30){
+    const summary=_generateCallSummary(_dmTranscript,(document.getElementById('dm-notes')||{}).value||'');
+    if(summary){
+      const el=document.getElementById('dm-ai-summary');
+      const wrap=document.getElementById('dm-ai-summary-wrap');
+      if(el) el.textContent=summary;
+      if(wrap) wrap.style.display='block';
+    }
+  }
+}
+
+// AI summary (client-side keyword extraction — no API needed)
+function _generateCallSummary(transcript,notes){
+  if(!transcript&&!notes) return '';
+  const text=(transcript+' '+notes).toLowerCase();
+  const points=[];
+  // Detect outcome signals
+  if(/booked|call scheduled|set up a call|let's do/.test(text)) points.push('📅 Call booked');
+  if(/not interested|no thanks|don't need|pass/.test(text)) points.push('🚫 Not interested');
+  if(/call back|follow up|reach out later|next week|next month/.test(text)) points.push('🔄 Follow up needed');
+  if(/voicemail|left a message/.test(text)) points.push('📱 Voicemail left');
+  if(/price|cost|expensive|afford|budget|money/.test(text)) points.push('💰 Price objection raised');
+  if(/busy|no time|hectic|work is mad/.test(text)) points.push('⏰ Time objection');
+  if(/try myself|figure it out|do it myself/.test(text)) points.push('💪 DIY objection');
+  if(/partner|spouse|wife|husband|think about/.test(text)) points.push('🤔 Needs to think/consult');
+  if(/yes|absolutely|interested|tell me more|sounds good/.test(text)) points.push('✅ Positive response');
+  if(points.length===0 && transcript.length>50) points.push('📝 Call completed — see notes for details');
+  return points.join(' · ')||'';
+}
+
 // CALL LOGGING
 // ═══════════════════════════════════════════════════════════
 function openLogCall(leadId){
