@@ -377,6 +377,7 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
     <button class="nav-item" onclick="showPage('outreach')"><span class="nav-icon">✉</span>Outreach<span class="nav-badge" id="badge-outreach"></span></button>
     <button class="nav-item" onclick="showPage('nurture')"><span class="nav-icon">♻</span>Nurture</button>
     <button class="nav-item" onclick="showPage('vaguide')"><span class="nav-icon">📋</span>VA Guide</button>
+    <button class="nav-item" id="nav-ads" onclick="showPage('ads')"><span class="nav-icon">🎯</span>LinkedIn Ads<span class="nav-badge" id="badge-ads" style="background:#3b82f6"></span></button>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">Insights</div>
@@ -575,6 +576,11 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
 
     <div class="page" id="page-reports">
       <div class="report-grid" id="report-grid"></div>
+    </div>
+
+    <!-- LINKEDIN ADS PAGE -->
+    <div class="page" id="page-ads" style="overflow-y:auto;padding:0">
+      <div id="ads-page-inner" style="padding:24px 28px;max-width:1100px"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -1850,7 +1856,7 @@ const PER_PAGE = 50;
 const pageTitles = {
   dashboard:'Dashboard',leads:'Leads Database',pipeline:'Pipeline Board',
   opportunities:'Opportunities',smartviews:'Smart Views',dialblocks:'Dial Blocks',
-  tasks:'Tasks & Follow-Ups',outreach:'Outreach',nurture:'Nurture',sales:'Sales Tracker',reports:'Reports',settings:'Settings',vaguide:'VA Guide'
+  tasks:'Tasks & Follow-Ups',outreach:'Outreach',nurture:'Nurture',sales:'Sales Tracker',reports:'Reports',settings:'Settings',vaguide:'VA Guide',ads:'LinkedIn Ads'
 };
 function showPage(name){
   const s = DB.settings;
@@ -1881,6 +1887,7 @@ function renderPage(name){
   else if(name==='nurture') renderNurture();
   else if(name==='sales') renderSalesTracker();
   else if(name==='reports') renderReports();
+  else if(name==='ads') renderLinkedInAds();
   else if(name==='settings') renderSettings();
   updateBadges();
 }
@@ -3534,6 +3541,179 @@ function updateBadges(){
       ob.textContent=qc||'';
     }
   }catch(e){}
+  // LinkedIn Ads badge: new uncontacted ad leads
+  try{
+    const ab=document.getElementById('badge-ads');
+    if(ab){
+      const newAds=getLeads().filter(l=>l.source==='LinkedIn Ad'&&(!l.stage||l.stage==='New Lead')).length;
+      ab.textContent=newAds||'';
+    }
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════
+// LINKEDIN ADS PAGE
+// ═══════════════════════════════════════════════════════════
+function renderLinkedInAds(){
+  const wrap=document.getElementById('ads-page-inner');
+  if(!wrap) return;
+  const sbUrl=localStorage.getItem('tle_sb_url')||'';
+  const sbKey=localStorage.getItem('tle_sb_key')||'';
+  const allLeads=getLeads();
+  const adLeads=allLeads.filter(l=>l.source==='LinkedIn Ad'||l.source==='LinkedIn Ads'||l.pipeline==='Inbound');
+  const newLeads=adLeads.filter(l=>!l.calledAt&&(!l.stage||l.stage==='New Lead'));
+  const booked=adLeads.filter(l=>l.firstBooked||l.stage==='First Call Booked');
+  const closed=adLeads.filter(l=>l.closed||l.stage==='Won');
+  const adSpend=+(localStorage.getItem('tle_ad_spend')||0);
+  const cpl=adLeads.length&&adSpend?'€'+(adSpend/adLeads.length).toFixed(0):'—';
+  const closeRate=adLeads.length?Math.round(closed.length/adLeads.length*100):0;
+
+  const zapierPayload=JSON.stringify({
+    data:{
+      name:"{{First Name}} {{Last Name}}",
+      email:"{{Email}}",
+      phone:"{{Phone Number}}",
+      linkedin:"{{LinkedIn Profile URL}}",
+      company:"{{Company}}",
+      role:"{{Job Title}}",
+      source:"LinkedIn Ad",
+      stage:"New Lead",
+      pipeline:"Inbound",
+      temperature:"Hot",
+      tags:["LinkedIn Ad"],
+      added:new Date().toISOString().split('T')[0]
+    }
+  },null,2);
+
+  wrap.innerHTML=`
+  <div style="margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:22px;font-weight:700;color:var(--text1)">🎯 LinkedIn Ad Leads</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:3px">Leads land here the second they fill in your LinkedIn ad form via Zapier</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="SB.pull().then(()=>{renderLinkedInAds();updateBadges();toast('✓ Synced')})">⟳ Sync Now</button>
+      <button class="btn btn-ghost btn-sm" onclick="showPage('leads')">All Leads →</button>
+    </div>
+  </div>
+
+  ${newLeads.length>0?`
+  <!-- CALL NOW SECTION -->
+  <div style="margin-bottom:24px">
+    <div style="font-size:13px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">🔥 Call These Now (${newLeads.length})</div>
+    <div style="display:grid;gap:12px">
+      ${newLeads.sort((a,b)=>new Date(b.added||0)-new Date(a.added||0)).map(l=>`
+        <div style="background:var(--card);border:2px solid #ef444430;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:17px;font-weight:700;color:var(--text1);margin-bottom:2px">${l.name||'—'}</div>
+            <div style="font-size:13px;color:var(--text2)">${l.role||''}${l.role&&l.company?' @ ':''}${l.company||''}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:3px">${l.email||''}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:var(--navy);letter-spacing:.02em">${l.phone||'No phone'}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">came in ${l.added?new Date(l.added).toLocaleDateString('en-IE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'recently'}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${l.phone?`<a href="tel:${l.phone.replace(/\s/g,'')}" class="btn btn-primary" style="font-size:13px;padding:10px 20px;text-decoration:none;text-align:center">📞 Call Now</a>`:'<div style="font-size:12px;color:var(--text2)">No phone number</div>'}
+            <button class="btn btn-ghost btn-sm" onclick="openDetail('${l.id}')">View Profile</button>
+            <button class="btn btn-ghost btn-sm" style="font-size:11px;color:#10b981" onclick="(()=>{const ls=getLeads();const i=ls.findIndex(x=>x.id==='${l.id}'||x.id==${l.id});if(i>-1){ls[i].calledAt=new Date().toISOString();ls[i].stage='Contacted';DB.saveLeads(ls);renderLinkedInAds();updateBadges();toast('✓ Marked as called')}})()">✓ Mark Called</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  `:''}
+
+
+  <!-- STATS -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:28px">
+    <div class="card" style="text-align:center;padding:18px 12px">
+      <div style="font-size:32px;font-weight:800;color:#3b82f6">${adLeads.length}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Total Ad Leads</div>
+    </div>
+    <div class="card" style="text-align:center;padding:18px 12px">
+      <div style="font-size:32px;font-weight:800;color:#f59e0b">${newLeads.length}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">New / Uncontacted</div>
+    </div>
+    <div class="card" style="text-align:center;padding:18px 12px">
+      <div style="font-size:32px;font-weight:800;color:#10b981">${booked.length}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Calls Booked</div>
+    </div>
+    <div class="card" style="text-align:center;padding:18px 12px">
+      <div style="font-size:32px;font-weight:800;color:#a78bfa">${closed.length}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Closed</div>
+    </div>
+    <div class="card" style="text-align:center;padding:18px 12px">
+      <div style="font-size:32px;font-weight:800;color:var(--gold)">${closeRate}%</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Close Rate</div>
+    </div>
+    <div class="card" style="text-align:center;padding:18px 12px">
+      <div style="font-size:32px;font-weight:800;color:#ef4444">${cpl}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Cost Per Lead</div>
+      <input type="number" placeholder="Ad spend €" style="margin-top:8px;width:100%;font-size:11px;padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text1)" value="${adSpend||''}" onchange="localStorage.setItem('tle_ad_spend',this.value);renderLinkedInAds()">
+    </div>
+  </div>
+
+  <!-- ZAPIER STATUS -->
+  <div style="background:#10b98112;border:1px solid #10b98140;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+    <div style="font-size:20px">⚡</div>
+    <div>
+      <div style="font-weight:700;color:#10b981;font-size:14px">Zapier Connected</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:2px">LinkedIn Lead Gen Form → This CRM + Liam's Google Sheet + Gmail notification</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="SB.pull().then(()=>{renderLinkedInAds();updateBadges();toast('✓ Synced')})">⟳ Sync</button>
+  </div>
+
+  <!-- LEAD FEED -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:var(--text1)">📋 Ad Leads (${adLeads.length})</div>
+      ${newLeads.length?`<span style="background:#3b82f620;color:#3b82f6;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">${newLeads.length} new</span>`:''}
+    </div>
+    ${adLeads.length===0?`
+      <div style="text-align:center;padding:40px;color:var(--text2)">
+        <div style="font-size:32px;margin-bottom:12px">📭</div>
+        <div style="font-size:14px;font-weight:600">No LinkedIn Ad leads yet</div>
+        <div style="font-size:13px;margin-top:6px">Leads from LinkedIn ads will appear here automatically when someone fills in your LinkedIn ad form.</div>
+      </div>
+    `:`
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Name</th><th>Email</th><th>Phone</th><th>Company</th><th>Role</th><th>Stage</th><th>Added</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${adLeads.sort((a,b)=>new Date(b.added||0)-new Date(a.added||0)).map(l=>`
+            <tr>
+              <td><strong style="cursor:pointer;color:var(--gold)" onclick="openDetail('${l.id}')">${l.name||'—'}</strong></td>
+              <td style="font-size:12px">${l.email||'—'}</td>
+              <td style="font-size:12px">${l.phone||'—'}</td>
+              <td style="font-size:12px">${l.company||'—'}</td>
+              <td style="font-size:12px">${l.role||'—'}</td>
+              <td><span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${l.closed?'#10b98120':l.firstBooked?'#f59e0b20':'#3b82f620'};color:${l.closed?'#10b981':l.firstBooked?'#f59e0b':'#3b82f6'}">${l.stage||'New Lead'}</span></td>
+              <td style="font-size:12px;color:var(--text2)">${l.added||'—'}</td>
+              <td>
+                <button class="btn btn-ghost btn-sm" onclick="openDetail('${l.id}')">Open</button>
+                <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="quickBookAd('${l.id}')">📅 Book Call</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table></div>
+    `}
+  </div>`;
+}
+
+function quickBookAd(id){
+  const leads=getLeads();
+  const idx=leads.findIndex(l=>l.id===id||l.id==id);
+  if(idx===-1) return;
+  leads[idx].stage='First Call Booked';
+  leads[idx].firstBooked=true;
+  leads[idx].temperature='Hot';
+  DB.saveLeads(leads);
+  renderLinkedInAds();
+  updateBadges();
+  toast('✓ Marked as Call Booked');
 }
 function currentActivePage(){
   const a=document.querySelector('.page.active');
