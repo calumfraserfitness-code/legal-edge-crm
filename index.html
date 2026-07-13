@@ -3594,6 +3594,7 @@ function renderLinkedInAds(){
     <div style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="SB.pull().then(()=>{renderLinkedInAds();updateBadges();toast('✓ Synced')})">⟳ Sync Now</button>
       <button class="btn btn-ghost btn-sm" onclick="showPage('leads')">All Leads →</button>
+      <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#ef444440" onclick="clearAllAdLeads()">🗑 Clear Test Leads</button>
     </div>
   </div>
 
@@ -3703,6 +3704,29 @@ function renderLinkedInAds(){
   </div>`;
 }
 
+function clearAllAdLeads(){
+  if(!confirm('Delete ALL leads in the LinkedIn Ads section? This cannot be undone.')) return;
+  const leads = getLeads();
+  const adLeads = leads.filter(l=>l.source==='LinkedIn Ad'||l.source==='LinkedIn Ads'||l.pipeline==='Inbound');
+  const remaining = leads.filter(l=>l.source!=='LinkedIn Ad'&&l.source!=='LinkedIn Ads'&&l.pipeline!=='Inbound');
+  const ids = adLeads.map(l=>l.id);
+  localStorage.setItem('tle_leads', JSON.stringify(remaining));
+  if(ids.length && localStorage.getItem('tle_sb_url')) {
+    ids.forEach(id => {
+      fetch(`${localStorage.getItem('tle_sb_url')}/rest/v1/tle_leads?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': localStorage.getItem('tle_sb_key'),
+          'Authorization': 'Bearer ' + localStorage.getItem('tle_sb_key'),
+          'Content-Type': 'application/json'
+        }
+      });
+    });
+  }
+  renderLinkedInAds();
+  updateBadges();
+  toast('✓ All test leads cleared');
+}
 function quickBookAd(id){
   const leads=getLeads();
   const idx=leads.findIndex(l=>l.id===id||l.id==id);
