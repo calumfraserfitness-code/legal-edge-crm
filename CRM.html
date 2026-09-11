@@ -1772,7 +1772,7 @@ function openDetail(id){
       </div>`
     :'<span style="color:var(--text2);font-size:13px">No phone on record</span>';
   document.getElementById('dp-email').innerHTML=l.email?`<a href="mailto:${l.email}">${l.email}</a>`:'—';
-  document.getElementById('dp-linkedin').innerHTML=l.linkedin?`<a href="${l.linkedin.startsWith('http')?l.linkedin:'https://'+l.linkedin}" target="_blank">View Profile ↗</a>`:'—';
+  {const linkedinUrl=l.linkedin||l.linkedin_url||l.linkedinUrl||l.profileUrl||(l.data&&(l.data.linkedin||l.data.linkedin_url||l.data.linkedinUrl||l.data.profileUrl))||'';document.getElementById('dp-linkedin').innerHTML=linkedinUrl?`<a href="${linkedinUrl.startsWith('http')?linkedinUrl:'https://'+linkedinUrl}" target="_blank" rel="noopener" style="word-break:break-all">${linkedinUrl}</a>`:'—';}
   document.getElementById('dp-role').textContent=l.role||'—';
   document.getElementById('dp-leadtype').textContent=l.leadType||'—';
   document.getElementById('dp-grade').innerHTML=gradeBadge(l.grade);

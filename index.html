@@ -2881,7 +2881,7 @@ function openDetail(id){
       </div>`
     :'<span style="color:var(--text2);font-size:13px">No phone on record</span>';
   document.getElementById('dp-email').innerHTML=l.email?`<a href="mailto:${l.email}">${l.email}</a>`:'—';
-  document.getElementById('dp-linkedin').innerHTML=l.linkedin?`<a href="${l.linkedin.startsWith('http')?l.linkedin:'https://'+l.linkedin}" target="_blank">View Profile ↗</a>`:'—';
+  {const linkedinUrl=l.linkedin||l.linkedin_url||l.linkedinUrl||l.profileUrl||(l.data&&(l.data.linkedin||l.data.linkedin_url||l.data.linkedinUrl||l.data.profileUrl))||'';document.getElementById('dp-linkedin').innerHTML=linkedinUrl?`<a href="${linkedinUrl.startsWith('http')?linkedinUrl:'https://'+linkedinUrl}" target="_blank" rel="noopener" style="word-break:break-all">${linkedinUrl}</a>`:'—';}
   document.getElementById('dp-role').textContent=l.role||'—';
   document.getElementById('dp-leadtype').textContent=l.leadType||'—';
   document.getElementById('dp-grade').innerHTML=gradeBadge(l.grade);
@@ -3108,7 +3108,7 @@ function _loadDialLead(){
   document.getElementById('dm-calls-before').textContent=prevCalls?'Called '+prevCalls+'x before':'Never called';
   document.getElementById('dm-contact-links').innerHTML=[
     l.email?`<a href="mailto:${l.email}" style="color:rgba(255,255,255,.6);font-size:12px;text-decoration:none;background:rgba(255,255,255,.1);padding:4px 10px;border-radius:20px">✉ ${l.email}</a>`:'',
-    l.linkedin?`<a href="${l.linkedin.startsWith('http')?l.linkedin:'https://'+l.linkedin}" target="_blank" style="color:rgba(255,255,255,.6);font-size:12px;text-decoration:none;background:rgba(255,255,255,.1);padding:4px 10px;border-radius:20px">🔗 LinkedIn</a>`:'',
+    (l.linkedin||l.linkedin_url||l.linkedinUrl||l.profileUrl||(l.data&&(l.data.linkedin||l.data.linkedin_url||l.data.linkedinUrl||l.data.profileUrl)))?(()=>{const u=l.linkedin||l.linkedin_url||l.linkedinUrl||l.profileUrl||(l.data&&(l.data.linkedin||l.data.linkedin_url||l.data.linkedinUrl||l.data.profileUrl));return `<a href="${u.startsWith('http')?u:'https://'+u}" target="_blank" rel="noopener" style="color:rgba(255,255,255,.75);font-size:12px;text-decoration:none;background:rgba(255,255,255,.1);padding:4px 10px;border-radius:20px;max-width:100%;word-break:break-all">🔗 ${u}</a>`})():'',
   ].join('');
   // Reset form
   document.getElementById('dm-outcome').value='';
