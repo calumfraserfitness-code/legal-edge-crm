@@ -354,6 +354,7 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
 .stat-chip-label { font-size:10px;font-weight:700;color:var(--text2);margin-top:3px;text-align:center; }
 
 </style>
+<link rel="stylesheet" href="lifecycle.css">
 </head>
 <body>
 <div id="app">
@@ -368,6 +369,7 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
     <button class="nav-item" onclick="showPage('leads')"><span class="nav-icon">👤</span>Leads<span class="nav-badge" id="badge-leads">0</span></button>
     <button class="nav-item" onclick="showPage('pipeline')"><span class="nav-icon">◈</span>Pipeline</button>
     <button class="nav-item" onclick="showPage('opportunities')"><span class="nav-icon">◆</span>Opportunities</button>
+    <button class="nav-item" onclick="showPage('lifecycle')"><span class="nav-icon">↻</span>Client Lifecycle<span class="nav-badge" id="badge-lifecycle">0</span></button>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">Work</div>
@@ -431,6 +433,8 @@ tbody td{padding:10px 12px;font-size:13px;color:var(--text);vertical-align:middl
         <tbody id="dash-hot-tbody"></tbody></table></div>
       </div>
     </div>
+
+    <div class="page" id="page-lifecycle"><div id="lifecycle-root"></div></div>
 
     <!-- LEADS -->
     <div class="page" id="page-leads">
@@ -1594,8 +1598,8 @@ const IMPORTED_MSG_EVENTS = [];
 // Get these from: supabase.com → your project → Settings → API
 // ═══════════════════════════════════════════════════════════
 // Credentials stored in localStorage so they persist across sessions
-const SUPABASE_URL = localStorage.getItem('tle_sb_url') || '';   // saved via Settings page
-const SUPABASE_KEY = localStorage.getItem('tle_sb_key') || '';   // saved via Settings page
+const SUPABASE_URL = localStorage.getItem('tle_sb_url') || 'https://fsnzlphhasagfffxdwtq.supabase.co';
+const SUPABASE_KEY = localStorage.getItem('tle_sb_key') || 'sb_publishable_7Px6PH6Cz71_krABYR6AJQ_3r3hSVDf';
 
 // ── Supabase active when both values are filled ──
 const USE_SUPABASE = SUPABASE_URL !== '' && SUPABASE_KEY !== '';
@@ -1843,7 +1847,7 @@ const PER_PAGE = 50;
 const pageTitles = {
   dashboard:'Dashboard',leads:'Leads Database',pipeline:'Pipeline Board',
   opportunities:'Opportunities',smartviews:'Smart Views',dialblocks:'Dial Blocks',
-  tasks:'Tasks & Follow-Ups',outreach:'Outreach',nurture:'Nurture',sales:'Sales Tracker',reports:'Reports',settings:'Settings',vaguide:'VA Guide',ads:'LinkedIn Ads'
+  tasks:'Tasks & Follow-Ups',outreach:'Outreach',nurture:'Nurture',sales:'Sales Tracker',reports:'Reports',settings:'Settings',vaguide:'VA Guide',ads:'LinkedIn Ads',lifecycle:'Client Lifecycle'
 };
 function showPage(name){
   const s = DB.settings;
@@ -1870,6 +1874,7 @@ function renderPage(name){
   else if(name==='smartviews') renderSmartViews();
   else if(name==='dialblocks'){initDialFilters();renderDialBlock();}
   else if(name==='tasks') renderTasks();
+  else if(name==='lifecycle' && window.Lifecycle) Lifecycle.render();
   else if(name==='outreach') renderOutreach();
   else if(name==='nurture') renderNurture();
   else if(name==='sales') renderSalesTracker();
@@ -4640,6 +4645,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 
 </script>
+<script src="lifecycle.js"></script>
 
 <!-- DIAL SESSION OVERLAY -->
 <div class="dial-overlay" id="dial-overlay">
